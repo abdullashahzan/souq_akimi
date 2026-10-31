@@ -5,6 +5,13 @@ get everything delivered to your room. Flutter (iOS + Android) on Firebase
 (Auth + Firestore). **Cash on delivery only** — the app never touches a card, a
 wallet or a payment provider.
 
+## Preview
+
+<img src="docs/screenshots/browse_ar.png" width="310" alt="Arabic Browse screen with the corrected Souq Akimi brand and floating navigation"> <img src="docs/screenshots/sell_ar.png" width="310" alt="Arabic Sell screen offering a product or a service">
+
+Screenshots from the release app on the Android tablet. The empty catalogue is
+intentional: launch data contains no demo listings.
+
 ---
 
 ## What a student can do
@@ -144,6 +151,9 @@ current model was tested with Arabic/English text and JSON responses and uses
 a 512-token output budget. Empty, malformed and truncated responses are rejected
 without replacing the student's existing text. Network failures, timeouts,
 credentials and rate limits have user-facing errors.
+
+Generated drafts can still contain inaccurate claims or awkward wording. Always
+review descriptions, tags and announcements before publishing them.
 
 **Security:** keys compiled into an APK are extractable, even when supplied with
 `--dart-define`. Do not commit `dart_defines.json` or publish keyed APKs as public

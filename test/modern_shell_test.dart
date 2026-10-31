@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:souq_akimi/core/l10n.dart';
 import 'package:souq_akimi/core/theme.dart';
 import 'package:souq_akimi/features/shell/app_shell.dart';
+import 'package:souq_akimi/features/browse/browse_screen.dart';
+import 'package:souq_akimi/features/sell/sell_screen.dart';
+import 'package:souq_akimi/features/services/services_screen.dart';
 import 'package:souq_akimi/models/product.dart';
 import 'package:souq_akimi/providers/auth.dart';
+import 'package:souq_akimi/providers/catalogue.dart';
 import 'package:souq_akimi/providers/dependencies.dart';
 import 'package:souq_akimi/providers/notifications.dart';
 import 'package:souq_akimi/providers/sellers.dart';
@@ -94,4 +99,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  for (final arabic in [false, true]) {
+    for (final screen in <String, Widget>{
+      'Browse': const BrowseScreen(),
+      'Sell': const SellScreen(),
+      'Services': const ServicesScreen(),
+    }.entries) {
+      testWidgets(
+        '${screen.key} fits a 360px phone in ${arabic ? 'Arabic' : 'English'}',
+        (tester) async {
+          tester.view.physicalSize = const Size(360, 844);
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          SharedPreferences.setMockInitialValues({
+            'souq.locale': arabic ? 'ar' : 'en',
+          });
+          final prefs = await SharedPreferences.getInstance();
+          AppLocale.current = arabic ? AppLanguage.arabic : AppLanguage.english;
+          await tester.pumpWidget(
+            ProviderScope(
+              overrides: [
+                sharedPreferencesProvider.overrideWithValue(prefs),
+                productsProvider.overrideWith((ref) => Stream.value([])),
+                servicesProvider.overrideWith((ref) => Stream.value([])),
+                myProductsProvider.overrideWith((ref) => Stream.value([])),
+                myServicesProvider.overrideWith((ref) => Stream.value([])),
+              ],
+              child: MaterialApp(
+                theme: AppTheme.light(),
+                locale: Locale(arabic ? 'ar' : 'en'),
+                supportedLocales: const [Locale('en'), Locale('ar')],
+                localizationsDelegates: const [
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                home: screen.value,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(find.text('The campus marketplace'), findsNothing);
+          expect(find.text('What would you like to sell?'), findsNothing);
+        },
+      );
+    }
+  }
 }
