@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "105148624941",
+    "project_id": "souqakimi",
+    "storage_bucket": "souqakimi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:105148624941:android:58ca977bcfd36e251748a4",
+        "android_client_info": {
+          "package_name": "com.example.souq_akimi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "105148624941-inabt63vblfpjbgt2rd2ntm9a0q59upc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.souq_akimi",
+            "certificate_hash": "9f4f9fdd10c24316f8948e3a565b0724cdf099fe"
+          }
+        },
+        {
+          "client_id": "105148624941-hpq1ogq6808h1608f07dsvtgveurvff4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCuzmFsklRNGXDBAEqmgI2wrVhS-N3ySr4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "105148624941-hpq1ogq6808h1608f07dsvtgveurvff4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>سوق أكيمي — سوق الطلاب داخل الحرم الجامعي</title>
+  <meta name="description" content="سوق أكيمي تطبيق أندرويد آمن لبيع وشراء المستلزمات وطلب الخدمات بين طلاب الجامعة، مع دفع عند الاستلام.">
+  <meta property="og:title" content="سوق أكيمي">
+  <meta property="og:description" content="بيع، اشترِ، واطلب الخدمات داخل جامعتك.">
+  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0F6B5C">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --teal: #0F6B5C;
+      --teal-dark: #0A4A40;
+      --teal-soft: #E7F3F0;
+      --amber: #B7791F;
+      --amber-soft: #FBF3E4;
+      --ink: #131A18;
+      --muted: #54615D;
+      --line: #DFE5E3;
+      --paper: #FFFFFF;
+      --wash: #F7F9F8;
+      --radius: 20px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Cairo", system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      line-height: 1.75;
+    }
+    a { color: var(--teal); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .wrap { width: min(1120px, calc(100% - 40px)); margin-inline: auto; }
+    header {
+      position: sticky; top: 0; z-index: 20;
+      background: rgba(255,255,255,.9);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--line);
+    }
+    .nav { display: flex; align-items: center; gap: 20px; min-height: 72px; }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 19px; color: var(--ink); }
+    .brand:hover { text-decoration: none; }
+    .mark {
+      width: 42px; height: 42px; border-radius: 13px;
+      display: grid; place-items: center;
+      background: var(--teal); color: #fff; font-size: 24px; font-weight: 800;
+      box-shadow: 0 8px 24px rgba(15,107,92,.18);
+    }
+    .nav-links { display: flex; gap: 22px; margin-inline-start: auto; align-items: center; font-size: 14px; font-weight: 600; color: var(--muted); }
+    .nav-links a { color: var(--muted); }
+    .nav-links a:hover { color: var(--teal); }
+    .lang {
+      border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+      border-radius: 999px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 700;
+      cursor: pointer;
+    }
+    .lang:hover { border-color: var(--teal); color: var(--teal); }
+    .hero { padding: 76px 0 52px; background: radial-gradient(1200px 500px at 85% -10%, var(--teal-soft), transparent 60%); }
+    .hero-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 54px; align-items: center; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: var(--teal-soft); color: var(--teal-dark);
+      border-radius: 999px; padding: 7px 14px;
+      font-size: 13px; font-weight: 700;
+    }
+    h1 { font-size: clamp(34px, 5vw, 58px); line-height: 1.18; margin: 20px 0 18px; letter-spacing: -.5px; }
+    .lead { color: var(--muted); font-size: 18px; max-width: 56ch; margin: 0 0 28px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      min-height: 52px; padding: 0 24px; border-radius: 13px;
+      font-weight: 700; font-size: 15px; border: 1px solid transparent;
+    }
+    .btn:hover { text-decoration: none; transform: translateY(-1px); }
+    .btn-primary { background: var(--teal); color: #fff; box-shadow: 0 12px 28px rgba(15,107,92,.22); }
+    .btn-secondary { background: #fff; color: var(--teal); border-color: var(--line); }
+    .hero-card {
+      background: #fff; border: 1px solid var(--line); border-radius: 28px;
+      padding: 16px; box-shadow: 0 24px 70px rgba(19,26,24,.10);
+      position: relative;
+    }
+    .phone {
+      border-radius: 22px; background: var(--wash); border: 1px solid var(--line);
+      padding: 18px; overflow: hidden;
+    }
+    .phone-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; font-size: 12px; color: var(--muted); }
+    .dot { width: 9px; height: 9px; border-radius: 50%; background: #34A853; display: inline-block; margin-inline-end: 6px; }
+    .mini-search {
+      background: #fff; border: 1px solid var(--line); border-radius: 12px;
+      padding: 11px 14px; color: #8A9692; font-size: 12px; margin-bottom: 14px;
+    }
+    .mini-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .mini-card { background: #fff; border: 1px solid var(--line); border-radius: 15px; padding: 9px; }
+    .thumb { height: 86px; border-radius: 11px; margin-bottom: 8px; }
+    .t1 { background: linear-gradient(140deg, #CFE9E2, #8FCBBE); }
+    .t2 { background: linear-gradient(140deg, #F6E7C8, #E6C287); }
+    .t3 { background: linear-gradient(140deg, #D9E7F5, #9DBEDD); }
+    .t4 { background: linear-gradient(140deg, #EBDDEB, #C7A7C5); }
+    .mini-title { height: 8px; width: 78%; border-radius: 4px; background: #DCE3E1; margin-bottom: 6px; }
+    .mini-price { height: 8px; width: 42%; border-radius: 4px; background: var(--teal-soft); }
+    .float {
+      position: absolute; inset-inline-start: -22px; bottom: 38px;
+      background: #fff; border: 1px solid var(--line); border-radius: 15px;
+      padding: 12px 15px; box-shadow: 0 14px 40px rgba(19,26,24,.12);
+      font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 9px;
+    }
+    .float .tick { width: 26px; height: 26px; border-radius: 50%; background: var(--teal-soft); color: var(--teal); display: grid; place-items: center; }
+    section { padding: 72px 0; }
+    .section-head { max-width: 680px; margin-bottom: 34px; }
+    .section-head h2 { font-size: clamp(26px, 3.5vw, 38px); margin: 0 0 10px; letter-spacing: -.3px; }
+    .section-head p { margin: 0; color: var(--muted); }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .feature {
+      background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 24px; transition: transform .15s ease, box-shadow .15s ease;
+    }
+    .feature:hover { transform: translateY(-3px); box-shadow: 0 18px 40px rgba(19,26,24,.07); }
+    .icon {
+      width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center;
+      background: var(--teal-soft); color: var(--teal); font-size: 21px; margin-bottom: 16px;
+    }
+    .feature h3 { font-size: 18px; margin: 0 0 7px; }
+    .feature p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .steps { background: var(--wash); border-block: 1px solid var(--line); }
+    .step-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; counter-reset: step; }
+    .step {
+      background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 24px; position: relative;
+    }
+    .step::before {
+      counter-increment: step; content: counter(step);
+      display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+      background: var(--teal); color: #fff; font-weight: 800; font-size: 14px; margin-bottom: 16px;
+    }
+    .step h3 { margin: 0 0 6px; font-size: 17px; }
+    .step p { margin: 0; color: var(--muted); font-size: 14px; }
+    .safety { display: grid; grid-template-columns: .9fr 1.1fr; gap: 40px; align-items: center; }
+    .safety-panel {
+      background: var(--teal); color: #fff; border-radius: 28px; padding: 34px;
+      background-image: radial-gradient(500px 220px at 100% 0%, rgba(255,255,255,.14), transparent 65%);
+    }
+    .safety-panel h2 { margin: 0 0 10px; font-size: 30px; }
+    .safety-panel p { margin: 0 0 22px; color: rgba(255,255,255,.8); }
+    .safety-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 13px; }
+    .safety-list li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: rgba(255,255,255,.92); }
+    .safety-list span { color: #F3D08A; font-weight: 800; }
+    .safety-copy h2 { font-size: clamp(26px, 3.5vw, 38px); margin: 0 0 14px; }
+    .safety-copy p { color: var(--muted); margin: 0 0 14px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .chip { background: var(--amber-soft); color: #7A4F12; border-radius: 999px; padding: 7px 13px; font-size: 12px; font-weight: 700; }
+    .cta {
+      text-align: center; border: 1px solid var(--line); border-radius: 28px;
+      padding: 44px 24px; background: linear-gradient(180deg, #fff, var(--wash));
+    }
+    .cta h2 { margin: 0 0 10px; font-size: clamp(26px, 3.5vw, 38px); }
+    .cta p { margin: 0 auto 24px; max-width: 560px; color: var(--muted); }
+    footer { border-top: 1px solid var(--line); padding: 30px 0 40px; color: var(--muted); font-size: 13px; }
+    .foot { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; align-items: center; }
+    .foot-links { display: flex; gap: 18px; flex-wrap: wrap; }
+    .foot-links a { color: var(--muted); }
+    .en { display: none; }
+    html[data-lang="en"] .ar { display: none; }
+    html[data-lang="en"] .en { display: block; }
+    html[data-lang="en"] { direction: ltr; }
+    html[data-lang="en"] body { font-family: "Cairo", system-ui, sans-serif; }
+    html[data-lang="en"] .nav-links { margin-inline-start: auto; }
+    @media (max-width: 900px) {
+      .hero-grid, .safety { grid-template-columns: 1fr; }
+      .hero { padding-top: 52px; }
+      .features, .step-grid { grid-template-columns: 1fr 1fr; }
+      .float { inset-inline-start: 12px; }
+    }
+    @media (max-width: 620px) {
+      .features, .step-grid { grid-template-columns: 1fr; }
+      .nav-links a:not(.lang-link) { display: none; }
+      .hero-card { margin-top: 10px; }
+      .brand span { font-size: 17px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="/" aria-label="سوق أكيمي">
+        <span class="mark" aria-hidden="true">س</span>
+        <span class="ar">سوق أكيمي</span><span class="en">Souq Akimi</span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#features" class="ar">المزايا</a>
+        <a href="#features" class="en">Features</a>
+        <a href="#how" class="ar">كيف يعمل</a>
+        <a href="#how" class="en">How it works</a>
+        <a href="/privacy" class="ar">الخصوصية</a>
+        <a href="/privacy" class="en">Privacy</a>
+        <button class="lang lang-link" id="langBtn" type="button" aria-label="Switch language">English</button>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div>
+          <span class="eyebrow"><span aria-hidden="true">●</span><span class="ar">سوق الطلاب داخل الحرم الجامعي</span><span class="en">The campus student marketplace</span></span>
+          <h1 class="ar">كل ما تحتاجه في الجامعة،<br>من طلاب مثلِك.</h1>
+          <h1 class="en">Everything you need on campus,<br>from students like you.</h1>
+          <p class="lead ar">بِع مستلزماتك، اشترِ ما تحتاجه، واطلب الخدمات من زملائك بسهولة وأمان — بأسعار بالريال السعودي والدفع عند الاستلام.</p>
+          <p class="lead en">Sell what you no longer need, find what you do, and book services from fellow students — priced in SAR with cash on delivery.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="mailto:abdullashahzan@gmail.com?subject=%D8%B7%D9%84%D8%A8%20%D8%A7%D9%84%D8%A7%D9%86%D8%B6%D9%85%D8%A7%D9%85%20%D8%A5%D9%84%D9%89%20%D8%B3%D9%88%D9%82%20%D8%B9%D9%83%D9%8A%D9%85%D9%8A">
+              <span class="ar">انضم إلى السوق</span><span class="en">Join the marketplace</span>
+            </a>
+            <a class="btn btn-secondary" href="#features"><span class="ar">تعرّف على المزايا</span><span class="en">Explore features</span></a>
+          </div>
+        </div>
+        <div class="hero-card" aria-hidden="true">
+          <div class="phone">
+            <div class="phone-top"><span><span class="dot"></span> HA220ZY7</span><span>٩:٤١</span></div>
+            <div class="mini-search ar">ابحث عن كتاب، آلة حاسبة، أو خدمة…</div>
+            <div class="mini-search en">Search books, calculators, services…</div>
+            <div class="mini-grid">
+              <div class="mini-card"><div class="thumb t1"></div><div class="mini-title"></div><div class="mini-price"></div></div>
+              <div class="mini-card"><div class="thumb t2"></div><div class="mini-title"></div><div class="mini-price"></div></div>
+              <div class="mini-card"><div class="thumb t3"></div><div class="mini-title"></div><div class="mini-price"></div></div>
+              <div class="mini-card"><div class="thumb t4"></div><div class="mini-title"></div><div class="mini-price"></div></div>
+            </div>
+          </div>
+          <div class="float"><span class="tick">✓</span><span class="ar">تم البيع لطالب موثّق</span><span class="en">Sold to a verified student</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="features">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 class="ar">مصمَّم لحياة الجامعة</h2>
+          <h2 class="en">Built for campus life</h2>
+          <p class="ar">واجهة عربية وإنجليزية، صور واضحة، وتواصل مباشر — بدون تعقيد.</p>
+          <p class="en">Arabic and English, clear photos, and direct contact — without the clutter.</p>
+        </div>
+        <div class="features">
+          <article class="feature">
+            <div class="icon" aria-hidden="true">🛍️</div>
+            <h3 class="ar">بِع واشترِ بسهولة</h3><h3 class="en">Buy and sell easily</h3>
+            <p class="ar">أضف منتجك مع حتى ٦ صور، وحدّد السعر والتفاصيل في دقائق.</p>
+            <p class="en">List an item with up to six photos, a price, and the details that matter.</p>
+          </article>
+          <article class="feature">
+            <div class="icon" aria-hidden="true">🧰</div>
+            <h3 class="ar">خدمات من زملائك</h3><h3 class="en">Services from students</h3>
+            <p class="ar">اطلب تصويراً، تصميمًا، صيانة، أو أي خدمة، وحدّد المبنى والغرفة والجوال.</p>
+            <p class="en">Request photography, design, repairs, or anything else — with building, room, and mobile details.</p>
+          </article>
+          <article class="feature">
+            <div class="icon" aria-hidden="true">🤖</div>
+            <h3 class="ar">مساعد ذكي للكتابة</h3><h3 class="en">AI writing helper</h3>
+            <p class="ar">اقتراحات تلقائية للوصف والوسوم والملخص، لتجهيز إعلانك بسرعة.</p>
+            <p class="en">Automatic suggestions for descriptions, tags, and summaries to speed up your listing.</p>
+          </article>
+          <article class="feature">
+            <div class="icon" aria-hidden="true">💵</div>
+            <h3 class="ar">أسعار بالريال</h3><h3 class="en">Prices in SAR</h3>
+            <p class="ar">كل الأسعار بالريال السعودي، والدفع عند الاستلام لتجربة أوضح.</p>
+            <p class="en">Every price is in Saudi riyals, with cash on delivery for a clearer experience.</p>
+          </article>
+          <article class="feature">
+            <div class="icon" aria-hidden="true">🔐</div>
+            <h3 class="ar">حساب موثّق</h3><h3 class="en">Verified account</h3>
+            <p class="ar">سجّل بالبريد أو بحساب Google، وتابع مبيعاتك وتقييماتك في مكان واحد.</p>
+            <p class="en">Sign in with email or Google, and keep your sales and ratings in one place.</p>
+          </article>
+          <article class="feature">
+            <div class="icon" aria-hidden="true">🛡️</div>
+            <h3 class="ar">إشراف ومحتوى آمن</h3><h3 class="en">Moderation and safety</h3>
+            <p class="ar">فريق إشراف يراجع البلاغات ويحذف المخالفات، مع إشعارات واضحة.</p>
+            <p class="en">A moderation team reviews reports and removes violations, with clear notifications.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="how" class="steps">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 class="ar">ثلاث خطوات فقط</h2>
+          <h2 class="en">Three simple steps</h2>
+          <p class="ar">من الفكرة إلى الصفقة، كل شيء داخل التطبيق.</p>
+          <p class="en">From idea to deal, everything happens in the app.</p>
+        </div>
+        <div class="step-grid">
+          <article class="step">
+            <h3 class="ar">أنشئ حسابك</h3><h3 class="en">Create your account</h3>
+            <p class="ar">سجّل بالبريد الإلكتروني أو بحساب Google، وأكمل ملفك الشخصي.</p>
+            <p class="en">Sign up with email or Google, then complete your profile.</p>
+          </article>
+          <article class="step">
+            <h3 class="ar">أضف إعلانك أو طلبك</h3><h3 class="en">Post a listing or request</h3>
+            <p class="ar">اختر «بيع منتج» أو «بيع خدمة»، وأضف الصور والسعر والتفاصيل.</p>
+            <p class="en">Choose “sell a product” or “sell a service,” then add photos, price, and details.</p>
+          </article>
+          <article class="step">
+            <h3 class="ar">اتفق واستلم</h3><h3 class="en">Agree and receive</h3>
+            <p class="ar">تواصل مع الطالب، أكّد الطلب، واستلم بالدفع عند التسليم.</p>
+            <p class="en">Chat with the student, confirm the order, and pay cash on delivery.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap safety">
+        <div class="safety-panel">
+          <h2 class="ar">سوقك، بأمان</h2>
+          <h2 class="en">Your market, safer</h2>
+          <p class="ar">قواعد واضحة تحمي الطلاب وتُبقي التجربة نظيفة.</p>
+          <p class="en">Clear rules that protect students and keep the marketplace clean.</p>
+          <ul class="safety-list">
+            <li><span aria-hidden="true">✓</span><span class="ar">حسابات موثّقة بالبريد أو Google</span><span class="en">Verified email or Google accounts</span></li>
+            <li><span aria-hidden="true">✓</span><span class="ar">إشراف على الإعلانات والبلاغات</span><span class="en">Moderated listings and reports</span></li>
+            <li><span aria-hidden="true">✓</span><span class="ar">الدفع عند الاستلام داخل الحرم</span><span class="en">Cash on delivery on campus</span></li>
+            <li><span aria-hidden="true">✓</span><span class="ar">بياناتك لا تُباع لأي طرف</span><span class="en">Your data is never sold</span></li>
+          </ul>
+        </div>
+        <div class="safety-copy">
+          <h2 class="ar">للطلاب، وبالطلاب</h2>
+          <h2 class="en">For students, by students</h2>
+          <p class="ar">سوق أكيمي مساحة مخصصة لطلاب الجامعة. نراجع المحتوى، ونمنع السلع المحظورة، ونوفّر قنوات واضحة للبلاغات والدعم.</p>
+          <p class="en">Souq Akimi is a space for university students. We review content, prohibit restricted goods, and provide clear channels for reports and support.</p>
+          <p class="ar">لديك سؤال أو ملاحظة؟ راسلنا في أي وقت.</p>
+          <p class="en">Questions or feedback? Write to us anytime.</p>
+          <div class="chips">
+            <span class="chip ar">عربي</span><span class="chip en">Arabic</span>
+            <span class="chip ar">English</span><span class="chip en">English</span>
+            <span class="chip ar">دفع عند الاستلام</span><span class="chip en">Cash on delivery</span>
+            <span class="chip ar">الرياض</span><span class="chip en">Riyadh</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-top:0">
+      <div class="wrap">
+        <div class="cta">
+          <h2 class="ar">جاهز تبدأ؟</h2>
+          <h2 class="en">Ready to start?</h2>
+          <p class="ar">انضم إلى سوق أكيمي، وتواصل مع طلاب جامعتك.</p>
+          <p class="en">Join Souq Akimi and connect with students on your campus.</p>
+          <a class="btn btn-primary" href="mailto:abdullashahzan@gmail.com?subject=%D8%B7%D9%84%D8%A8%20%D8%A7%D9%84%D8%A7%D9%86%D8%B6%D9%85%D8%A7%D9%85%20%D8%A5%D9%84%D9%89%20%D8%B3%D9%88%D9%82%20%D8%B9%D9%83%D9%8A%D9%85%D9%8A">
+            <span class="ar">راسلنا للانضمام</span><span class="en">Contact us to join</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <div>
+        <span class="ar">© ٢٠٢٦ سوق أكيمي — صُنع لطلاب الجامعة.</span>
+        <span class="en">© 2026 Souq Akimi — built for university students.</span>
+      </div>
+      <div class="foot-links">
+        <a href="/privacy"><span class="ar">سياسة الخصوصية</span><span class="en">Privacy Policy</span></a>
+        <a href="/terms"><span class="ar">الشروط والأحكام</span><span class="en">Terms of Service</span></a>
+        <a href="mailto:abdullashahzan@gmail.com"><span class="ar">الدعم</span><span class="en">Support</span></a>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var root = document.documentElement;
+      var btn = document.getElementById('langBtn');
+      var saved = null;
+      try { saved = localStorage.getItem('souq-akimi-lang'); } catch (e) {}
+      function apply(lang) {
+        root.setAttribute('lang', lang);
+        root.setAttribute('dir', lang === 'ar' ? 'rtl' : 'ltr');
+        root.setAttribute('data-lang', lang);
+        btn.textContent = lang === 'ar' ? 'English' : 'العربية';
+        btn.setAttribute('aria-label', lang === 'ar' ? 'Switch to English' : 'التبديل إلى العربية');
+        try { localStorage.setItem('souq-akimi-lang', lang); } catch (e) {}
+      }
+      apply(saved === 'en' ? 'en' : 'ar');
+      btn.addEventListener('click', function () {
+        apply(root.getAttribute('data-lang') === 'ar' ? 'en' : 'ar');
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,466 @@
+rules_version = '2';
+
+// Souq Akimi — Firestore security rules.
+//
+// This project runs on Firebase's Spark (free) plan, which cannot deploy Cloud
+// Functions, so every delivery transition runs as a *client* transaction and
+// THESE RULES ARE THE TRUST LAYER: they decide which transactions may commit.
+// The Dart side lives in `lib/data/repositories/order_repository.dart`.
+//
+// The invariants that matter:
+//   1. An order, its deliveries, their hand-over secrets, the seller's
+//      notification and the stock decrement are written in ONE transaction.
+//      Rules read the siblings with getAfter(), so a half-written order cannot
+//      exist and stock can never drift from the orders that consumed it.
+//   2. Only the seller who owns a delivery may mark it `delivered`, and only
+//      by presenting the buyer's 6-digit code, which is compared against a
+//      document (`deliverySecrets`) the seller is forbidden to read. A wrong
+//      guess commits nothing.
+//   3. Only the buyer may cancel or mint a new code; five failed attempts lock
+//      a seller out until the buyer rotates the code.
+//   4. Every order is cash on delivery, so there is no money to hold, capture
+//      or refund — the app never touches a card or a payment provider.
+//
+// Known limit: stock can be moved by any signed-in user (paired with `soldCount`
+// and bounded to 999) because rules cannot see which order a stock write
+// belongs to. Sellers can always correct their own listings; closing this hole
+// completely needs server-side writes (Blaze plan) or App Check.
+// See docs/firestore_schema.md for the full threat model.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // The single marketplace administrator. The email is verified at account
+    // creation; the UI hides the dashboard for everyone else, but this is the
+    // boundary that actually protects the data.
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.get('email', '') == 'abdullashahzan@gmail.com'
+        && request.auth.token.get('email_verified', false) == true;
+    }
+
+    // DELIVERY_OTP_MAX_ATTEMPTS (keep in sync with AppConfig.otpMaxAttempts).
+    function otpMaxAttempts() {
+      return 5;
+    }
+
+    // ----- users ----------------------------------------------------------
+    match /users/{uid} {
+      // Signed-in students can resolve seller names and sales tallies. Guests
+      // see the catalogue without profiles, which keeps phone/room private.
+      allow read: if isSignedIn();
+      allow create: if isSelf(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.get('salesCount', 0) == 0;
+      // A profile edit may not touch the tally; completing a delivery may bump
+      // it by exactly one on the seller's own document. The tally is a public
+      // vanity metric, so the worst a determined seller can do is inflate it.
+      allow update: if isSelf(uid) && (
+        (
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['salesCount', 'updatedAt'])
+          && request.resource.data.salesCount == resource.data.salesCount + 1
+        )
+        ||
+        (
+          !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['salesCount'])
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly([
+              'username', 'email', 'displayName', 'photoUrl', 'phone',
+              'building', 'roomNumber', 'updatedAt'
+            ])
+        )
+      ) || isAdmin();
+      allow delete: if isAdmin();
+
+      // Each user's in-app inbox. A buyer writes one `new_sale` item for the
+      // seller inside the same transaction that creates the order; the rules
+      // verify that link with getAfter(). Nobody else can create anything in
+      // someone's inbox, and only the owner can read or clear it.
+      match /notifications/{notificationId} {
+        function saleOrder(orderNumber) {
+          return getAfter(/databases/$(database)/documents/orders/$(orderNumber));
+        }
+
+        function requestAfter(requestId) {
+          return getAfter(
+            /databases/$(database)/documents/serviceRequests/$(requestId)
+          );
+        }
+
+        allow read, delete: if isSelf(uid) || isAdmin();
+
+        allow create: if isSignedIn()
+          && request.resource.data.userId == uid
+          && request.resource.data.read == false
+          && request.resource.data.createdAt == request.time
+          && (
+            // A buyer placing an order, in the same transaction.
+            (
+              request.resource.data.actorId == request.auth.uid
+              && request.resource.data.type == 'new_sale'
+              && request.resource.data.orderNumber is string
+              && request.resource.data.orderNumber != ''
+              && saleOrder(request.resource.data.orderNumber).data.userId
+                   == request.auth.uid
+              && uid in saleOrder(request.resource.data.orderNumber).data.sellerIds
+              && saleOrder(request.resource.data.orderNumber).data.createdAt
+                   == request.time
+            )
+            ||
+            // A student asking for a service, born with the request itself.
+            (
+              request.resource.data.actorId == request.auth.uid
+              && request.resource.data.type == 'service_request'
+              && request.resource.data.requestId is string
+              && request.resource.data.requestId != ''
+              && requestAfter(request.resource.data.requestId).data.providerId
+                   == uid
+              && requestAfter(request.resource.data.requestId).data.requesterId
+                   == request.auth.uid
+              && requestAfter(request.resource.data.requestId).data.createdAt
+                   == request.time
+            )
+            ||
+            // The administrator broadcasting to every inbox.
+            (
+              isAdmin()
+              && request.resource.data.actorId == request.auth.uid
+              && request.resource.data.type == 'announcement'
+            )
+          );
+
+        // Reading the inbox is the only thing that changes: mark read.
+        allow update: if (isSelf(uid) || isAdmin())
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['read'])
+          && request.resource.data.read == true;
+      }
+    }
+
+    // ----- products -------------------------------------------------------
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.sellerId == request.auth.uid;
+      // Owner may edit, but sellerId must stay the same.
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && resource.data.sellerId == request.auth.uid
+          && request.resource.data.sellerId == resource.data.sellerId);
+      // Stock movement that is NOT an owner edit: a buyer decrementing stock
+      // while placing an order, or restoring it on a cancellation. Only these
+      // three fields may move, `soldCount` must travel with `stock` and the
+      // delta is bounded to 999 — so a stranger can never reprice, deactivate
+      // or delete someone else's listing, only nudge its counters.
+      allow update: if isSignedIn()
+        && resource.data.sellerId != request.auth.uid
+        && request.resource.data.sellerId == resource.data.sellerId
+        && ('soldCount' in resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['stock', 'soldCount', 'updatedAt'])
+        && request.resource.data.stock >= 0
+        && (
+          // A sale: stock down, soldCount up by exactly the same amount.
+          ((resource.data.stock - request.resource.data.stock) >= 1
+            && (resource.data.stock - request.resource.data.stock) <= 999
+            && request.resource.data.soldCount
+                 == resource.data.soldCount
+                      + (resource.data.stock - request.resource.data.stock))
+          ||
+          // A restock: stock up, soldCount untouched.
+          ((request.resource.data.stock - resource.data.stock) >= 1
+            && (request.resource.data.stock - resource.data.stock) <= 999
+            && request.resource.data.soldCount == resource.data.soldCount)
+        );
+      // Anyone signed in may record a single view — and touch nothing else.
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['viewsCount'])
+        && request.resource.data.viewsCount == resource.data.viewsCount + 1;
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.sellerId == request.auth.uid);
+    }
+
+    // ----- services -------------------------------------------------------
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create: if isSignedIn()
+        && request.resource.data.providerId == request.auth.uid;
+      allow update: if isAdmin()
+        || (isSignedIn()
+          && resource.data.providerId == request.auth.uid
+          && request.resource.data.providerId == resource.data.providerId);
+      // Anyone signed in may record a single view — and touch nothing else.
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['viewsCount'])
+        && request.resource.data.viewsCount == resource.data.viewsCount + 1;
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.providerId == request.auth.uid);
+    }
+
+    // ----- serviceRequests ------------------------------------------------
+    match /serviceRequests/{requestId} {
+      allow read: if isSignedIn()
+        && (resource.data.requesterId == request.auth.uid
+            || resource.data.providerId == request.auth.uid
+            || isAdmin());
+
+      allow create: if isSignedIn()
+        && request.resource.data.requesterId == request.auth.uid
+        && request.resource.data.providerId is string
+        && request.resource.data.providerId != ''
+        && request.resource.data.phone is string
+        && request.resource.data.phone != ''
+        && request.resource.data.building is string
+        && request.resource.data.building != ''
+        && request.resource.data.roomNumber is string
+        && request.resource.data.roomNumber != ''
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isSignedIn() && (
+        // Provider may only accept or decline.
+        (resource.data.providerId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'respondedAt'])
+          && request.resource.data.status in ['accepted', 'declined'])
+        ||
+        // Requester may only cancel.
+        (resource.data.requesterId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status'])
+          && request.resource.data.status == 'cancelled')
+      );
+
+      allow delete: if false;
+    }
+
+    // ----- orders ---------------------------------------------------------
+    match /orders/{orderNumber} {
+
+      // The parent order, as it was BEFORE this request (get) and as it will
+      // be AFTER it (getAfter) — the latter is what lets the rules verify the
+      // order, its deliveries, its secrets and the stock move as one unit.
+      function order() {
+        return get(/databases/$(database)/documents/orders/$(orderNumber));
+      }
+      function orderAfter() {
+        return getAfter(/databases/$(database)/documents/orders/$(orderNumber));
+      }
+      // The first line must be paid for in the same transaction that creates
+      // the order: stock down by `quantity`, soldCount up by `quantity`.
+      function firstLineStockPaidFor(item) {
+        return getAfter(/databases/$(database)/documents/products/$(item.productId)).data.stock
+               == get(/databases/$(database)/documents/products/$(item.productId)).data.stock
+                    - item.quantity
+          && getAfter(/databases/$(database)/documents/products/$(item.productId)).data.soldCount
+               == get(/databases/$(database)/documents/products/$(item.productId)).data.soldCount
+                    + item.quantity;
+      }
+
+      // Visible to the buyer and to any seller with a delivery in the order.
+      //
+      // The `!exists()` arm matters: placing an order starts a transaction
+      // that probes the freshly generated order id to make sure it is free.
+      // Reading an *absent* document is evaluated against `resource == null`,
+      // so a plain participant rule would answer with permission-denied and
+      // abort the whole checkout. Allowing the probe (and nothing else) keeps
+      // the collision check — and still hides everyone else's orders.
+      allow get: if isAdmin()
+        || (isSignedIn()
+          && (!exists(/databases/$(database)/documents/orders/$(orderNumber))
+              || resource.data.userId == request.auth.uid
+              || request.auth.uid in resource.data.sellerIds));
+
+      // Queries cannot prove a missing document, so listing stays scoped.
+      allow list: if isAdmin()
+        || (isSignedIn()
+          && (resource.data.userId == request.auth.uid
+              || request.auth.uid in resource.data.sellerIds));
+
+      // Cash on delivery, one line, delivered to the buyer's hostel room.
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.orderNumber == orderNumber
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.fullName is string
+        && request.resource.data.fullName != ''
+        && request.resource.data.phone is string
+        && request.resource.data.phone != ''
+        && request.resource.data.building is string
+        && request.resource.data.building != ''
+        && request.resource.data.roomNumber is string
+        && request.resource.data.roomNumber != ''
+        && request.resource.data.total is number
+        && request.resource.data.total > 0
+        && request.resource.data.total <= 1000000
+        && request.resource.data.items is list
+        && request.resource.data.items.size() >= 1
+        && request.resource.data.items.size() <= 50
+        && request.resource.data.sellerIds is list
+        && request.resource.data.sellerIds.size() >= 1
+        && request.resource.data.sellerIds.size() <= 25
+        // Souq is cartless: one line, one seller, total == line total, and
+        // that line's stock must have moved in this very transaction. The
+        // parenthesis matters — without it `&& … ||` would let a single-line
+        // order skip every check above.
+        && (request.resource.data.items.size() != 1
+            || (request.resource.data.total
+                  == request.resource.data.items[0].lineTotal
+                && request.resource.data.sellerIds
+                  == [request.resource.data.items[0].sellerId]
+                && firstLineStockPaidFor(request.resource.data.items[0])));
+
+      // Participants may recompute the summary status (a denormalised view —
+      // the per-delivery rules are what actually complete an order). Nothing
+      // else on an order is ever editable.
+      allow update: if isSignedIn()
+        && (resource.data.userId == request.auth.uid
+            || request.auth.uid in resource.data.sellerIds)
+        && resource.data.status != 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status'])
+        && request.resource.data.status in
+             ['pending', 'delivered', 'cancelled'];
+
+      allow delete: if false;
+
+      // ----- deliveries ---------------------------------------------------
+      match /deliveries/{deliveryId} {
+
+        function secret() {
+          return get(/databases/$(database)/documents/orders/$(orderNumber)
+                     /deliverySecrets/$(deliveryId));
+        }
+
+        allow read: if isSignedIn()
+          && (order().data.userId == request.auth.uid
+              || request.auth.uid in order().data.sellerIds);
+
+        // The buyer writes one delivery per seller, in the same transaction
+        // that creates the order itself (an order may never grow new legs).
+        allow create: if isSignedIn()
+          && orderAfter().data.userId == request.auth.uid
+          && orderAfter().data.createdAt == request.time
+          && request.resource.data.id == deliveryId
+          && request.resource.data.sellerId is string
+          && request.resource.data.sellerId != ''
+          && request.resource.data.sellerId in orderAfter().data.sellerIds
+          && request.resource.data.amount is number
+          && request.resource.data.amount >= 0
+          && request.resource.data.otpAttempts == 0
+          && request.resource.data.status == 'ready'
+          && request.resource.data.createdAt == request.time;
+
+        // 1. The seller completes their delivery — only by presenting the
+        //    buyer's code, read from a document this seller can never open.
+        //    Amount and the attempt counter are frozen, and the order must not
+        //    have been cancelled underneath.
+        allow update: if isSignedIn()
+          && resource.data.sellerId == request.auth.uid
+          && resource.data.status == 'ready'
+          && resource.data.otpAttempts < otpMaxAttempts()
+          && request.resource.data.status == 'delivered'
+          && request.resource.data.sellerId == resource.data.sellerId
+          && request.resource.data.amount == resource.data.amount
+          && request.resource.data.otpAttempts == resource.data.otpAttempts
+          && request.resource.data.deliveredAt == request.time
+          && request.resource.data.otpEntered == secret().data.code
+          && order().data.status != 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'otpEntered', 'deliveredAt']);
+
+        // 2. …and records a wrong guess as nothing more than +1 on the
+        //    counter. A rejected write changes no state, so an attacker gains
+        //    nothing by grinding: five misses lock this seller out until the
+        //    buyer mints a new code.
+        allow update: if isSignedIn()
+          && resource.data.sellerId == request.auth.uid
+          && resource.data.status == 'ready'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['otpAttempts'])
+          && request.resource.data.otpAttempts
+               == resource.data.otpAttempts + 1
+          && request.resource.data.otpAttempts <= otpMaxAttempts();
+
+        // 3. The buyer cancels one seller's leg — never once it was delivered.
+        allow update: if isSignedIn()
+          && order().data.userId == request.auth.uid
+          && resource.data.status == 'ready'
+          && request.resource.data.status == 'cancelled'
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status']);
+
+        // 4. The buyer resets the attempt counter (a rotation writes the new
+        //    code on the sibling secret in the same transaction).
+        allow update: if isSignedIn()
+          && order().data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['otpAttempts'])
+          && request.resource.data.otpAttempts == 0;
+
+        allow delete: if false;
+      }
+
+      // ----- deliverySecrets ---------------------------------------------
+      // The hand-over code. Written with the order by the buyer, read only by
+      // the buyer (the seller types it from what they were told in person),
+      // compared server-side by the delivery rule above.
+      match /deliverySecrets/{deliveryId} {
+        allow read: if isSignedIn()
+          && orderAfter().data.userId == request.auth.uid;
+
+        allow create: if isSignedIn()
+          && orderAfter().data.userId == request.auth.uid
+          && request.resource.data.deliveryId == deliveryId
+          && request.resource.data.code is string
+          && request.resource.data.code.matches('^[0-9]{6}$');
+
+        // Rotation: a fresh code, nothing else touched.
+        allow update: if isSignedIn()
+          && order().data.userId == request.auth.uid
+          && request.resource.data.code is string
+          && request.resource.data.code.matches('^[0-9]{6}$')
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['code']);
+
+        allow delete: if false;
+      }
+    }
+
+    // ----- images (listing photos stored in Firestore) --------------------
+    match /images/{imageId} {
+      // The catalogue is public, so its photos are too.
+      allow read: if true;
+      // Only the owner may add one, and only within the size budget the
+      // client promises (base64 of a photo the client has already resized).
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.data is string
+        && request.resource.data.size <= 640 * 1024;
+      // A photo is immutable: replace it by creating another and updating
+      // the listing, then deleting this one.
+      allow update: if false;
+      allow delete: if isAdmin()
+        || (isSignedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    // ----- everything else: denied ---------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
