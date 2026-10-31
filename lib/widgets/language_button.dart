@@ -18,10 +18,7 @@ class LanguageButton extends ConsumerWidget {
     final language = ref.watch(appLanguageProvider);
     return PopupMenuButton<AppLanguage>(
       tooltip: context.tr('Language'),
-      icon: Icon(
-        Icons.translate,
-        color: onDark ? Colors.white : null,
-      ),
+      icon: Icon(Icons.translate, color: onDark ? Colors.white : null),
       onSelected: (next) => ref.read(localeProvider.notifier).setLanguage(next),
       itemBuilder: (context) => [
         for (final option in AppLanguage.values)
@@ -40,9 +37,7 @@ class LanguageButton extends ConsumerWidget {
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  option == AppLanguage.arabic
-                      ? 'العربية'
-                      : 'English',
+                  option == AppLanguage.arabic ? 'العربية' : 'English',
                   style: TextStyle(
                     fontWeight: option == language
                         ? FontWeight.w700
@@ -73,9 +68,7 @@ class LanguageTile extends ConsumerWidget {
           context.tr('Language'),
           style: const TextStyle(fontWeight: FontWeight.w600),
         ),
-        subtitle: Text(
-          language == AppLanguage.arabic ? 'العربية' : 'English',
-        ),
+        subtitle: Text(language == AppLanguage.arabic ? 'العربية' : 'English'),
         trailing: SegmentedButton<AppLanguage>(
           showSelectedIcon: false,
           style: const ButtonStyle(
@@ -87,9 +80,8 @@ class LanguageTile extends ConsumerWidget {
             ButtonSegment(value: AppLanguage.arabic, label: Text('ع')),
           ],
           selected: {language},
-          onSelectionChanged: (selection) => ref
-              .read(localeProvider.notifier)
-              .setLanguage(selection.first),
+          onSelectionChanged: (selection) =>
+              ref.read(localeProvider.notifier).setLanguage(selection.first),
         ),
       ),
     );

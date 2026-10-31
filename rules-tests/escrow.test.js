@@ -883,6 +883,80 @@ describe('service requests and notifications', () => {
       }),
     );
   });
+
+  const draft = () => ({
+    serviceId: 'printing', serviceTitle: 'Printouts',
+    providerId: 'seller1', providerUsername: 'seller_one',
+    requesterId: 'buyer1', requesterUsername: 'buyer_one',
+    message: 'Please print my notes.', phone: '0500000000',
+    building: 'br10', roomNumber: '101', status: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  async function transition(db, status, actor = 'seller1', recipient = 'buyer1') {
+    const batch = db.batch();
+    batch.update(db.collection('serviceRequests').doc('transition'), {
+      status, respondedAt: FieldValue.serverTimestamp(),
+    });
+    batch.set(db.collection('users').doc(recipient).collection('notifications').doc(`transition_${status}`), {
+      id: `transition_${status}`, userId: recipient, actorId: actor,
+      actorUsername: actor, type: `request_${status}`, title: 'Request updated',
+      body: 'Printouts', orderNumber: '', requestId: 'transition', read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return batch.commit();
+  }
+
+  for (const status of ['accepted', 'declined']) {
+    it(`notifies the requester atomically when the provider ${status}`, async () => {
+      await assertSucceeds(buyer().collection('serviceRequests').doc('transition').set(draft()));
+      await assertSucceeds(transition(seller1(), status));
+      await assertSucceeds(buyer().collection('users').doc('buyer1').collection('notifications').doc(`transition_${status}`).get());
+      await assertFails(transition(seller1(), status));
+    });
+  }
+
+  it('notifies the provider when the requester cancels', async () => {
+    await assertSucceeds(buyer().collection('serviceRequests').doc('transition').set(draft()));
+    await assertSucceeds(transition(buyer(), 'cancelled', 'buyer1', 'seller1'));
+  });
+
+  it('lets only the provider finish accepted work and notifies the requester', async () => {
+    await assertSucceeds(buyer().collection('serviceRequests').doc('transition').set(draft()));
+    await assertFails(transition(seller1(), 'completed'));
+    await assertSucceeds(transition(seller1(), 'accepted'));
+    await assertFails(transition(buyer(), 'completed', 'buyer1'));
+    await assertSucceeds(transition(seller1(), 'completed'));
+    await assertFails(transition(seller1(), 'completed'));
+  });
+
+  it('rejects spoofed recipients, actors and repeated terminal transitions', async () => {
+    await assertSucceeds(buyer().collection('serviceRequests').doc('transition').set(draft()));
+    await assertFails(transition(stranger(), 'accepted', 'stranger'));
+    await assertFails(transition(seller1(), 'accepted', 'seller1', 'stranger'));
+    await assertFails(transition(buyer(), 'accepted', 'buyer1'));
+    await assertSucceeds(transition(seller1(), 'accepted'));
+    await assertFails(transition(seller1(), 'declined'));
+    await assertFails(transition(buyer(), 'cancelled', 'buyer1', 'seller1'));
+  });
+
+  it('does not notify from an unrelated update or replay an old response', async () => {
+    await assertSucceeds(buyer().collection('serviceRequests').doc('transition').set(draft()));
+    await assertFails(seller1().collection('users').doc('buyer1').collection('notifications').doc('transition_accepted').set({
+      id: 'transition_accepted', userId: 'buyer1', actorId: 'seller1',
+      actorUsername: 'seller_one', type: 'request_accepted', title: 'Accepted',
+      body: 'Printouts', orderNumber: '', requestId: 'transition', read: false,
+      createdAt: FieldValue.serverTimestamp(),
+    }));
+  });
+
+  it('cannot request a removed, inactive, mismatched or own service', async () => {
+    await assertFails(buyer().collection('serviceRequests').doc('missing').set({...draft(), serviceId: 'missing'}));
+    await assertFails(buyer().collection('serviceRequests').doc('mismatch').set({...draft(), providerId: 'stranger'}));
+    await assertFails(seller1().collection('serviceRequests').doc('own').set({...draft(), requesterId: 'seller1'}));
+    await assertSucceeds(seller1().collection('services').doc('printing').update({isActive: false}));
+    await assertFails(buyer().collection('serviceRequests').doc('inactive').set(draft()));
+  });
 });
 
 describe('seller sales tally', () => {

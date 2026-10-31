@@ -86,6 +86,7 @@ class StatusChip extends StatelessWidget {
   static Color _requestColor(ServiceRequestStatus status) => switch (status) {
     ServiceRequestStatus.pending => const Color(0xFFB7791F),
     ServiceRequestStatus.accepted => const Color(0xFF1B7F5A),
+    ServiceRequestStatus.completed => const Color(0xFF1B7F5A),
     ServiceRequestStatus.declined => const Color(0xFF8A3B12),
     ServiceRequestStatus.cancelled => const Color(0xFF6B6B6B),
   };

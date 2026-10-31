@@ -33,10 +33,7 @@ class Format {
   static final DateFormat _short = DateFormat('d MMM y');
   static final DateFormat _withTime = DateFormat('d MMM y · HH:mm');
   static final DateFormat _shortArabic = DateFormat('d MMM y', 'ar');
-  static final DateFormat _withTimeArabic = DateFormat(
-    'd MMM y · HH:mm',
-    'ar',
-  );
+  static final DateFormat _withTimeArabic = DateFormat('d MMM y · HH:mm', 'ar');
 
   static String date(DateTime? at) {
     if (at == null) return '';

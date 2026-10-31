@@ -1,6 +1,7 @@
 import 'package:souq_akimi/widgets/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/feedback.dart';
 import '../../core/format.dart';
@@ -11,6 +12,7 @@ import '../../models/service.dart';
 import '../../providers/dependencies.dart';
 import '../../providers/orders.dart';
 import '../../widgets/common.dart';
+import '../../widgets/notification_alerts.dart';
 
 /// The two sides of the service marketplace: briefs I sent, and briefs
 /// other students sent me.
@@ -26,6 +28,7 @@ class RequestsScreen extends ConsumerWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Requests'),
+          actions: const [InboxButton()],
           bottom: const TabBar(
             tabs: [
               Tab(text: 'Sent'),
@@ -91,13 +94,26 @@ class _RequestList extends ConsumerWidget {
             message: emptyMessage,
           );
         }
+        final focused = GoRouterState.of(context)
+            .uri
+            .queryParameters['request'];
+        final sorted = [...requests]
+          ..sort((a, b) {
+            if (a.id == focused) return -1;
+            if (b.id == focused) return 1;
+            return requests.indexOf(a).compareTo(requests.indexOf(b));
+          });
         return ListView.separated(
           padding: const EdgeInsets.all(16),
           itemCount: requests.length,
           separatorBuilder: (_, _) => const SizedBox(height: 12),
           itemBuilder: (context, index) => FadeSlideIn(
             index: index,
-            child: _RequestTile(request: requests[index], side: side),
+            child: _RequestTile(
+              key: ValueKey(sorted[index].id),
+              request: sorted[index],
+              side: side,
+            ),
           ),
         );
       },
@@ -105,17 +121,52 @@ class _RequestList extends ConsumerWidget {
   }
 }
 
-class _RequestTile extends ConsumerWidget {
-  const _RequestTile({required this.request, required this.side});
+class _RequestTile extends ConsumerStatefulWidget {
+  const _RequestTile({super.key, required this.request, required this.side});
 
   final ServiceRequest request;
   final _Side side;
+
+  @override
+  ConsumerState<_RequestTile> createState() => _RequestTileState();
+}
+
+class _RequestTileState extends ConsumerState<_RequestTile> {
+  bool _busy = false;
+  ServiceRequest get request => widget.request;
+  _Side get side => widget.side;
 
   Future<void> _act(
     BuildContext context,
     WidgetRef ref,
     ServiceRequestStatus status,
   ) async {
+    if (_busy) return;
+    if (status != ServiceRequestStatus.accepted) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(switch (status) {
+            ServiceRequestStatus.completed => 'Mark this request completed?',
+            ServiceRequestStatus.declined => 'Decline this request?',
+            _ => 'Cancel this request?',
+          }),
+          content: const Text('The other student will be notified.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep request'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+    }
+    setState(() => _busy = true);
     try {
       if (side == _Side.incoming) {
         await ref.read(serviceRepositoryProvider).respond(request.id, status);
@@ -125,6 +176,7 @@ class _RequestTile extends ConsumerWidget {
       if (context.mounted) {
         showMessage(switch (status) {
           ServiceRequestStatus.accepted => 'Request accepted.',
+          ServiceRequestStatus.completed => 'Request completed.',
           ServiceRequestStatus.declined => 'Request declined.',
           ServiceRequestStatus.cancelled => 'Request cancelled.',
           ServiceRequestStatus.pending => 'Request sent.',
@@ -132,11 +184,13 @@ class _RequestTile extends ConsumerWidget {
       }
     } catch (error) {
       if (context.mounted) showError(error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final otherParty = side == _Side.incoming
         ? '\u200E@${request.requesterUsername}'
@@ -235,33 +289,59 @@ class _RequestTile extends ConsumerWidget {
                 ),
               ),
             ],
-            if (request.status == ServiceRequestStatus.pending ||
-                request.status == ServiceRequestStatus.accepted) ...[
+            ...[
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  if (side == _Side.incoming) ...[
-                    if (request.status == ServiceRequestStatus.pending) ...[
+                  if (side == _Side.incoming &&
+                      request.status == ServiceRequestStatus.accepted)
+                    FilledButton.tonal(
+                      onPressed: _busy
+                          ? null
+                          : () => _act(
+                              context,
+                              ref,
+                              ServiceRequestStatus.completed,
+                            ),
+                      child: const Text('Mark completed'),
+                    ),
+                  if (request.status == ServiceRequestStatus.pending) ...[
+                    if (side == _Side.incoming) ...[
                       FilledButton.tonal(
-                        onPressed: () =>
-                            _act(context, ref, ServiceRequestStatus.accepted),
+                        onPressed: _busy
+                            ? null
+                            : () => _act(
+                                context,
+                                ref,
+                                ServiceRequestStatus.accepted,
+                              ),
                         child: const Text('Accept'),
                       ),
-                      const SizedBox(width: 8),
+                      OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _act(
+                                context,
+                                ref,
+                                ServiceRequestStatus.declined,
+                              ),
+                        child: const Text('Decline'),
+                      ),
+                    ] else ...[
+                      OutlinedButton(
+                        onPressed: _busy
+                            ? null
+                            : () => _act(
+                                context,
+                                ref,
+                                ServiceRequestStatus.cancelled,
+                              ),
+                        child: const Text('Cancel request'),
+                      ),
                     ],
-                    OutlinedButton(
-                      onPressed: () =>
-                          _act(context, ref, ServiceRequestStatus.declined),
-                      child: const Text('Decline'),
-                    ),
-                  ] else ...[
-                    OutlinedButton(
-                      onPressed: () =>
-                          _act(context, ref, ServiceRequestStatus.cancelled),
-                      child: const Text('Cancel request'),
-                    ),
                   ],
-                  const Spacer(),
                   TextButton(
                     onPressed: () =>
                         context.push('/service/${request.serviceId}'),
@@ -277,7 +357,6 @@ class _RequestTile extends ConsumerWidget {
   }
 }
 
-
 class _ContactBit extends StatelessWidget {
   const _ContactBit({required this.icon, required this.text});
 
@@ -287,18 +366,24 @@ class _ContactBit extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 15, color: theme.colorScheme.primary),
-        const SizedBox(width: 4),
-        Text(
-          text,
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+    return InkWell(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: text));
+        showMessage('Copied.');
+      },
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: theme.colorScheme.primary),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

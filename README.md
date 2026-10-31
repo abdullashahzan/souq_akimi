@@ -24,11 +24,11 @@ intentional: launch data contains no demo listings.
 | **Sell** | Choose a product or service; attach up to 6 photos; edit and deactivate listings |
 | **Notifications** | A purchase writes an in-app notification into the seller's inbox and raises a badge on the Orders tab — no push service, no server |
 | **Remembered details** | Name, phone, building and room are saved after the first order and prefilled next time |
-| **Services** | Campus services with requests (accept / decline / cancel), saved building/room/mobile details and provider inbox notifications |
+| **Services** | Requests (accept / decline / cancel / complete), saved building/room/mobile details, live inbox alerts and two-way status notifications |
 | **Account** | Email/password and Google sign-in, profile, delivery defaults, completed-sales tally, order + sale history, sign out |
 | **Languages** | Persisted English/Arabic switch, Arabic RTL layout and Cairo typography |
 | **AI helpers** | Groq drafts product/service descriptions, search tags, service briefs and admin announcements |
-| **Admin** | Verified-email administrator dashboard, listing moderation and in-app broadcasts |
+| **Admin** | Verified-email dashboard, inspect/pause/resume/remove listings, and confirmed in-app broadcasts |
 
 Every screen inside the app keeps the bottom navigation bar visible, and every
 screen has a working back control — including tab roots, where it falls back to
@@ -79,7 +79,28 @@ transaction, and `firestore.rules` is the trust layer. The rules enforce:
   (bounded to 999), so they can never reprice, deactivate or delete a listing.
 - **Image budget** — listing photos stored in Firestore are capped at 640 KB.
 
-`rules-tests/` exercises the security rules against the Firestore emulator (36 tests).
+`rules-tests/` exercises the security rules against the Firestore emulator (43 tests).
+
+### Request notifications
+
+- Creating a service request also writes the provider's private inbox entry in
+  the same transaction. New entries trigger an immediate tappable in-app alert
+  while the app is open, an unread Services badge, and a bell badge.
+- Accepting, declining, completing, or cancelling a request atomically notifies
+  the other student. Alert taps open the right Sent/Received tab and put that
+  specific request first. Read state is separate from dismissing an alert.
+- Opening the inbox no longer marks everything read. Open an entry or use
+  **Mark all read** explicitly. Alerts are locally deduplicated per account.
+- Providers can finish accepted requests using **Mark completed**, allowing a
+  later request for the same service. Terminal requests cannot be replayed or
+  changed; rules reject forged actors/recipients and unavailable services.
+- **Delivery limit:** this Spark-only architecture has no trusted push sender.
+  These are foreground alerts and a persistent inbox, not Android/iOS push when
+  the app is closed. Reopening loads unread updates. Reliable background push
+  requires FCM/APNs plus an authenticated server/worker; never embed service
+  account credentials in the client.
+
+See [buyer/seller/admin verification](docs/QA.md) for the latest exercised flows.
 
 Known limitation: Firestore rules cannot see *which* order a stock write belongs
 to, so any signed-in user can nudge a listing's `stock`/`soldCount` within the

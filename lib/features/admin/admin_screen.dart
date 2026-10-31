@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:souq_akimi/widgets/ui.dart';
 
 import '../../core/feedback.dart';
@@ -228,8 +229,7 @@ class _OverviewTab extends ConsumerWidget {
               const SizedBox(height: 22),
               const SoftBanner(
                 icon: Icons.bolt_outlined,
-                text:
-                    'Deleting a listing also removes its stored photos. Order history is kept for both sides.',
+                text: 'Deleting a listing also removes its stored photos. Order history is kept for both sides.',
               ),
             ],
           );
@@ -394,9 +394,8 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
         Expanded(
           child: _services
               ? services.when(
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (error, _) => ErrorRetry(
                     error: error,
                     onRetry: () => ref.invalidate(adminServicesProvider),
@@ -407,9 +406,7 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
                           (s) =>
                               query.isEmpty ||
                               s.title.toLowerCase().contains(query) ||
-                              s.providerUsername.toLowerCase().contains(
-                                query,
-                              ),
+                              s.providerUsername.toLowerCase().contains(query),
                         )
                         .toList();
                     if (filtered.isEmpty) {
@@ -427,6 +424,7 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
                         index: index,
                         child: _ServiceRow(
                           service: filtered[index],
+                          onToggle: () => _toggle(service: filtered[index]),
                           onRemove: () => _removeService(filtered[index]),
                         ),
                       ),
@@ -434,9 +432,8 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
                   },
                 )
               : products.when(
-                  loading: () => const Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
                   error: (error, _) => ErrorRetry(
                     error: error,
                     onRetry: () => ref.invalidate(adminProductsProvider),
@@ -465,6 +462,7 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
                         index: index,
                         child: _ProductRow(
                           product: filtered[index],
+                          onToggle: () => _toggle(product: filtered[index]),
                           onRemove: () => _removeProduct(filtered[index]),
                         ),
                       ),
@@ -498,6 +496,22 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
       await ref.read(adminRepositoryProvider).removeProduct(product);
       ref.invalidate(adminStatsProvider);
       if (mounted) showMessage('Listing removed.');
+    } catch (error) {
+      if (mounted) showError(error);
+    }
+  }
+
+  Future<void> _toggle({Product? product, Service? service}) async {
+    try {
+      final repo = ref.read(adminRepositoryProvider);
+      if (product != null) {
+        await repo.setProductActive(product.id, !product.isActive);
+      }
+      if (service != null) {
+        await repo.setServiceActive(service.id, !service.isActive);
+      }
+      ref.invalidate(adminStatsProvider);
+      if (mounted) showMessage('Listing updated.');
     } catch (error) {
       if (mounted) showError(error);
     }
@@ -541,85 +555,105 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
 }
 
 class _ProductRow extends StatelessWidget {
-  const _ProductRow({required this.product, required this.onRemove});
+  const _ProductRow({
+    required this.product,
+    required this.onRemove,
+    required this.onToggle,
+  });
 
   final Product product;
   final VoidCallback onRemove;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 58,
-                height: 58,
-                child: ListingImage(
-                  url: product.coverImage,
-                  label: product.name,
-                  seed: product.id,
+      child: InkWell(
+        onTap: () => context.push('/product/${product.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 58,
+                  height: 58,
+                  child: ListingImage(
+                    url: product.coverImage,
+                    label: product.name,
+                    seed: product.id,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  Text(
-                    '\u200E@${product.sellerUsername} · ${Format.money(product.price)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      StatusChip(
-                        label: product.isActive ? 'Live' : 'Paused',
-                        color: product.isActive
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.outline,
-                        dense: true,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        context.tr(
-                          '{count} stock',
-                          args: {'count': '${product.stock}'},
+                    ),
+                    Text(
+                      '\u200E@${product.sellerUsername} · ${Format.money(product.price)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        StatusChip(
+                          label: product.isActive ? 'Live' : 'Paused',
+                          color: product.isActive
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outline,
+                          dense: true,
                         ),
-                        style: theme.textTheme.labelSmall,
-                      ),
-                    ],
-                  ),
-                ],
+                        Text(
+                          context.tr(
+                            '{count} stock',
+                            args: {'count': '${product.stock}'},
+                          ),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: context.tr('Remove'),
-              onPressed: onRemove,
-              icon: Icon(
-                Icons.delete_outline,
-                color: theme.colorScheme.error,
+              IconButton(
+                tooltip: context.tr(
+                  product.isActive ? 'Pause listing' : 'Resume listing',
+                ),
+                onPressed: onToggle,
+                icon: Icon(
+                  product.isActive
+                      ? Icons.pause_circle_outline
+                      : Icons.play_circle_outline,
+                ),
               ),
-            ),
-          ],
+              IconButton(
+                tooltip: context.tr('Remove'),
+                onPressed: onRemove,
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -627,73 +661,92 @@ class _ProductRow extends StatelessWidget {
 }
 
 class _ServiceRow extends StatelessWidget {
-  const _ServiceRow({required this.service, required this.onRemove});
+  const _ServiceRow({
+    required this.service,
+    required this.onRemove,
+    required this.onToggle,
+  });
 
   final Service service;
   final VoidCallback onRemove;
+  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: SizedBox(
-                width: 58,
-                height: 58,
-                child: ListingImage(
-                  url: service.coverImage,
-                  label: service.title,
-                  seed: service.id,
+      child: InkWell(
+        onTap: () => context.push('/service/${service.id}'),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 58,
+                  height: 58,
+                  child: ListingImage(
+                    url: service.coverImage,
+                    label: service.title,
+                    seed: service.id,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      service.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  Text(
-                    '\u200E@${service.providerUsername} · ${Format.priceWithUnit(service.price, service.priceType.suffix)}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    Text(
+                      '\u200E@${service.providerUsername} · ${Format.priceWithUnit(service.price, service.priceType.suffix)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  StatusChip(
-                    label: service.isActive ? 'Live' : 'Paused',
-                    color: service.isActive
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline,
-                    dense: true,
-                  ),
-                ],
+                    const SizedBox(height: 3),
+                    StatusChip(
+                      label: service.isActive ? 'Live' : 'Paused',
+                      color: service.isActive
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                      dense: true,
+                    ),
+                  ],
+                ),
               ),
-            ),
-            IconButton(
-              tooltip: context.tr('Remove'),
-              onPressed: onRemove,
-              icon: Icon(
-                Icons.delete_outline,
-                color: theme.colorScheme.error,
+              IconButton(
+                tooltip: context.tr(
+                  service.isActive ? 'Pause listing' : 'Resume listing',
+                ),
+                onPressed: onToggle,
+                icon: Icon(
+                  service.isActive
+                      ? Icons.pause_circle_outline
+                      : Icons.play_circle_outline,
+                ),
               ),
-            ),
-          ],
+              IconButton(
+                tooltip: context.tr('Remove'),
+                onPressed: onRemove,
+                icon: Icon(
+                  Icons.delete_outline,
+                  color: theme.colorScheme.error,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -780,11 +833,7 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
     try {
       final sent = await ref
           .read(adminRepositoryProvider)
-          .broadcast(
-            adminUid: uid,
-            title: _title.text,
-            body: _body.text,
-          );
+          .broadcast(adminUid: uid, title: _title.text, body: _body.text);
       if (!mounted) return;
       _title.clear();
       _body.clear();
@@ -899,7 +948,9 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
                             const SizedBox(height: 2),
                             Text(
                               _body.text.trim().isEmpty
-                                  ? context.tr('Your message preview appears here.')
+                                  ? context.tr(
+                                      'Your message preview appears here.',
+                                    )
                                   : _body.text.trim(),
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,

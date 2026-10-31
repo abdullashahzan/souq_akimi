@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
+import '../../core/feedback.dart';
 import '../../models/app_notification.dart';
 import '../../providers/auth.dart';
 import '../../providers/dependencies.dart';
@@ -12,8 +13,8 @@ import '../../widgets/common.dart';
 /// The seller's in-app inbox.
 ///
 /// New orders are written here by the buyer's device in the same transaction
-/// that creates the order. Opening the inbox clears the badge; tapping an item
-/// goes straight to the sale that needs delivering.
+/// that creates the order. Only tapping an entry or explicitly choosing
+/// "Mark all read" clears it; merely viewing the inbox never loses unread work.
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -23,41 +24,27 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 }
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
-  bool _marked = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _markAllRead());
-  }
-
   Future<void> _markAllRead() async {
-    if (_marked) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
-    _marked = true;
     try {
       await ref.read(notificationRepositoryProvider).markAllRead(uid);
-    } catch (_) {
-      // Clearing the badge is a convenience; never block the inbox for it.
+      if (mounted) showMessage('Notifications marked read.');
+    } catch (error) {
+      if (mounted) showError(error);
     }
   }
 
   Future<void> _open(AppNotification item) async {
     final uid = ref.read(currentUidProvider);
-    try {
-      if (uid != null && !item.read) {
-        await ref.read(notificationRepositoryProvider).markRead(uid, item.id);
-      }
-    } catch (_) {
-      // Same as above.
+    if (uid != null && !item.read) {
+      ref
+          .read(notificationRepositoryProvider)
+          .markRead(uid, item.id)
+          .catchError((Object _) {});
     }
     if (!mounted) return;
-    if (item.orderNumber.isNotEmpty) {
-      context.push('/sale/${item.orderNumber}');
-    } else if (item.requestId.isNotEmpty) {
-      context.push('/requests?tab=received');
-    }
+    if (!item.isAnnouncement) context.push(item.destination);
   }
 
   @override
@@ -68,6 +55,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       appBar: AppBar(
         title: const Text('Notifications'),
         leading: const SouqBackButton(fallback: '/orders'),
+        actions: [
+          TextButton(
+            onPressed: _markAllRead,
+            child: const Text('Mark all read'),
+          ),
+        ],
       ),
       body: inboxAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -80,8 +73,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             return const EmptyState(
               icon: Icons.notifications_none,
               title: 'No notifications yet',
-              message:
-                  'New orders, service requests and campus announcements will appear here.',
+              message: 'New orders, service requests and campus announcements will appear here.',
             );
           }
           return ListView.separated(
@@ -117,15 +109,15 @@ class _NotificationTile extends StatelessWidget {
           children: [
             CircleAvatar(
               backgroundColor: theme.colorScheme.primaryContainer,
-              child: Icon(
-                switch (item.type) {
-                  AppNotification.typeAnnouncement => Icons.campaign_outlined,
-                  AppNotification.typeServiceRequest =>
-                    Icons.handyman_outlined,
-                  _ => Icons.shopping_bag_outlined,
-                },
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
+              child: Icon(switch (item.type) {
+                AppNotification.typeAnnouncement => Icons.campaign_outlined,
+                AppNotification.typeRequestCompleted ||
+                AppNotification.typeServiceRequest ||
+                AppNotification.typeRequestAccepted ||
+                AppNotification.typeRequestDeclined ||
+                AppNotification.typeRequestCancelled => Icons.handyman_outlined,
+                _ => Icons.shopping_bag_outlined,
+              }, color: theme.colorScheme.onPrimaryContainer),
             ),
             if (!item.read)
               Positioned(

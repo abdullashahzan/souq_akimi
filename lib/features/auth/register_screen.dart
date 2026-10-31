@@ -1,5 +1,7 @@
 import 'package:souq_akimi/widgets/ui.dart';
+
 import '../../core/l10n.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -86,7 +88,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
-                      context.tr('Join {app}', args: {'app': AppConfig.appName}),
+                      context.tr(
+                        'Join {app}',
+                        args: {'app': context.tr(AppConfig.appNameEnglish)},
+                      ),
                       style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),

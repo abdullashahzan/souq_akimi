@@ -71,7 +71,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
 
         final photos = product.images.isNotEmpty
             ? product.images
-            : <String>['', product.id];
+            : <String>[''];
         final related = ref.watch(relatedProductsProvider(product.id));
         final isOwner = product.isOwnedBy(ref.watch(currentUidProvider) ?? '');
         final seller = ref.watch(sellerProfileProvider(product.sellerId)).value;
@@ -100,55 +100,58 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              AspectRatio(
-                aspectRatio: 4 / 3,
-                child: Stack(
-                  children: [
-                    // Flies in from the card's cover (see [productHeroTag]).
-                    Hero(
-                      tag: productHeroTag(product.id),
-                      child: PageView.builder(
-                        controller: _pageController,
-                        itemCount: photos.length,
-                        onPageChanged: (index) => setState(() => _page = index),
-                        itemBuilder: (context, index) => ListingImage(
-                          url: photos[index],
-                          label: product.name,
-                          // Page 0 uses the same tint seed as the card cover so
-                          // a photo-less listing does not flicker colour mid
-                          // flight.
-                          seed: index == 0
-                              ? product.id
-                              : '${product.id}-$index',
+              LayoutBuilder(
+                builder: (context, constraints) => SizedBox(
+                  height: (constraints.maxWidth * 0.75).clamp(200.0, 360.0),
+                  child: Stack(
+                    children: [
+                      // Flies in from the card's cover (see [productHeroTag]).
+                      Hero(
+                        tag: productHeroTag(product.id),
+                        child: PageView.builder(
+                          controller: _pageController,
+                          itemCount: photos.length,
+                          onPageChanged: (index) =>
+                              setState(() => _page = index),
+                          itemBuilder: (context, index) => ListingImage(
+                            url: photos[index],
+                            label: product.name,
+                            // Page 0 uses the same tint seed as the card cover so
+                            // a photo-less listing does not flicker colour mid
+                            // flight.
+                            seed: index == 0
+                                ? product.id
+                                : '${product.id}-$index',
+                          ),
                         ),
                       ),
-                    ),
-                    if (photos.length > 1)
-                      PositionedDirectional(
-                        bottom: 10,
-                        start: 0,
-                        end: 0,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            for (var i = 0; i < photos.length; i++)
-                              Container(
-                                width: 8,
-                                height: 8,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 3,
+                      if (photos.length > 1)
+                        PositionedDirectional(
+                          bottom: 10,
+                          start: 0,
+                          end: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              for (var i = 0; i < photos.length; i++)
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: i == _page
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.4),
+                                  ),
                                 ),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: i == _page
-                                      ? Colors.white
-                                      : Colors.white.withValues(alpha: 0.4),
-                                ),
-                              ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               Padding(
@@ -225,7 +228,9 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
                         leading: CircleAvatar(
                           child: Text(sellerName[0].toUpperCase()),
                         ),
-                        title: Text(sellerHandle(sellerName, seller?.salesCount)),
+                        title: Text(
+                          sellerHandle(sellerName, seller?.salesCount),
+                        ),
                         subtitle: const Text('Seller on campus'),
                         trailing: Icon(
                           Icons.verified_outlined,
@@ -266,7 +271,7 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
               if (related.isNotEmpty) ...[
                 const SectionHeader(title: 'More like this'),
                 SizedBox(
-                  height: 260,
+                  height: 340,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 16),

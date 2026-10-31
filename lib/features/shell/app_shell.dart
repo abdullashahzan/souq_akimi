@@ -7,6 +7,7 @@ import '../../core/l10n.dart';
 import '../../providers/auth.dart';
 import '../../providers/locale.dart';
 import '../../providers/notifications.dart';
+import '../../widgets/notification_alerts.dart';
 
 /// The signed-in shell: a floating bottom navigation bar that is present on
 /// **every** app screen, plus the "new orders" badge on the Orders tab.
@@ -55,15 +56,20 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(localeProvider);
     final badge = ref.watch(unreadNotificationCountProvider);
+    final serviceBadge = ref.watch(unreadServiceNotificationCountProvider);
     final signedIn = ref.watch(isSignedInProvider);
+    // Keep this account's real profile warm for listing handles and defaults.
+    // A one-off read in a form may otherwise return the email-based fallback.
+    if (signedIn) ref.watch(profileProvider);
     final index = indexFor(location);
 
     return Scaffold(
-      extendBody: true,
-      body: child,
+      extendBody: false,
+      body: signedIn ? NotificationAlerts(child: child) : child,
       bottomNavigationBar: _SouqBottomNav(
         selectedIndex: index,
         orderBadge: signedIn ? badge : 0,
+        serviceBadge: signedIn ? serviceBadge : 0,
         onSelected: (next) {
           if (next == index && location == _tabRoutes[next]) return;
           context.go(_tabRoutes[next]);
@@ -120,12 +126,14 @@ class _SouqBottomNav extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.orderBadge,
+    required this.serviceBadge,
     required this.onSelected,
   });
 
   final List<_NavItem> items;
   final int selectedIndex;
   final int orderBadge;
+  final int serviceBadge;
   final ValueChanged<int> onSelected;
 
   @override
@@ -162,7 +170,7 @@ class _SouqBottomNav extends StatelessWidget {
                     child: _NavButton(
                       item: items[i],
                       selected: selectedIndex == i,
-                      badge: i == 3 ? orderBadge : 0,
+                      badge: i == 1 ? serviceBadge : (i == 3 ? orderBadge : 0),
                       onTap: () => onSelected(i),
                     ),
                   ),

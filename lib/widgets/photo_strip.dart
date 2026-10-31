@@ -1,4 +1,5 @@
 import 'package:souq_akimi/widgets/ui.dart';
+
 import '../core/l10n.dart';
 
 import '../core/app_config.dart';
@@ -93,7 +94,9 @@ class PhotoStrip extends StatelessWidget {
                       width: 100,
                       height: 100,
                       decoration: BoxDecoration(
-                        border: Border.all(color: theme.colorScheme.outlineVariant),
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         color: theme.colorScheme.surfaceContainerLow,
                       ),
@@ -102,7 +105,9 @@ class PhotoStrip extends StatelessWidget {
                               child: SizedBox(
                                 width: 22,
                                 height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             )
                           : const Icon(Icons.add_a_photo_outlined),

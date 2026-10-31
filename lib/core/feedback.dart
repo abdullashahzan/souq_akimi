@@ -93,5 +93,7 @@ String describeError(Object error) {
       text.contains('invalid-login')) {
     return translate('That email and password do not match.');
   }
-  return kDebugMode ? raw : translate('Something went wrong. Please try again.');
+  return kDebugMode
+      ? raw
+      : translate('Something went wrong. Please try again.');
 }

@@ -134,9 +134,9 @@ class Service {
 }
 
 List<String> _imagesFromMap(Map<String, dynamic> data) {
-  final list = Codec.strings(
-    data['images'],
-  ).where((value) => value.trim().isNotEmpty).toList(growable: false);
+  final list = Codec.strings(data['images'])
+      .where((value) => value.trim().isNotEmpty)
+      .toList(growable: false);
   if (list.isNotEmpty) return list;
   final single = Codec.str(data['image']).trim();
   return single.isEmpty ? const <String>[] : <String>[single];

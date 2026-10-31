@@ -70,6 +70,14 @@ class AdminRepository {
     await _images.deleteAll(product.images);
   }
 
+  Future<void> setProductActive(String id, bool active) => _products
+      .doc(id)
+      .update({'isActive': active, 'updatedAt': FieldValue.serverTimestamp()});
+
+  Future<void> setServiceActive(String id, bool active) => _services
+      .doc(id)
+      .update({'isActive': active, 'updatedAt': FieldValue.serverTimestamp()});
+
   Future<void> removeService(Service service) async {
     await _services.doc(service.id).delete();
     await _images.deleteAll(service.images);

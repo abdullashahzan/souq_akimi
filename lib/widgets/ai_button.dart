@@ -95,4 +95,5 @@ class SoftBanner extends StatelessWidget {
   }
 }
 
-String localizedCategory(BuildContext context, String label) => context.tr(label);
+String localizedCategory(BuildContext context, String label) =>
+    context.tr(label);

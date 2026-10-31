@@ -37,9 +37,8 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     final serviceAsync = ref.watch(serviceByIdProvider(widget.serviceId));
 
     return serviceAsync.when(
-      loading: () => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      ),
+      loading: () =>
+          const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, _) => Scaffold(
         appBar: AppBar(leading: const SouqBackButton()),
         body: ErrorRetry(
@@ -65,7 +64,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
 
         final uid = ref.watch(currentUidProvider) ?? '';
         final isOwner = service.isOwnedBy(uid);
-        final seller = ref.watch(sellerProfileProvider(service.providerId)).value;
+        final seller = ref
+            .watch(sellerProfileProvider(service.providerId))
+            .value;
         final sellerName = seller?.username.trim().isNotEmpty == true
             ? seller!.username
             : service.providerUsername;
@@ -171,7 +172,9 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                           leading: CircleAvatar(
                             child: Text(
                               sellerName[0].toUpperCase(),
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           title: Text(
@@ -217,8 +220,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
                     const SizedBox(height: 18),
                     SoftBanner(
                       icon: Icons.location_on_outlined,
-                      text:
-                          'The provider comes to your hostel room. Share your building and room with the brief.',
+                      text: 'The provider comes to your hostel room. Share your building and room with the brief.',
                     ),
                   ],
                 ),
@@ -246,41 +248,7 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
     );
     if (data == null || !context.mounted) return;
 
-    final uid = ref.read(currentUidProvider) ?? '';
-    final profile = ref.read(profileOrEmptyProvider);
-    final username = profile.username.trim().isNotEmpty
-        ? profile.username
-        : (profile.displayName.trim().isNotEmpty
-              ? profile.displayName
-              : 'Student');
-    try {
-      await ref
-          .read(serviceRepositoryProvider)
-          .createRequest(
-            service: service,
-            requesterId: uid,
-            requesterUsername: username,
-            message: data.message,
-            phone: data.phone,
-            building: data.building,
-            roomNumber: data.roomNumber,
-          );
-      // Remember the contact details for the next brief/checkout, exactly like
-      // checkout does. Best-effort: a failed save must not fail the request.
-      try {
-        await ref
-            .read(userRepositoryProvider)
-            .saveDeliveryDetails(
-              uid: uid,
-              phone: data.phone,
-              building: data.building,
-              roomNumber: data.roomNumber,
-            );
-      } catch (_) {}
-      if (context.mounted) showMessage('Request sent.');
-    } catch (error) {
-      if (context.mounted) showError(error);
-    }
+    showMessage('Request sent.');
   }
 }
 
@@ -299,11 +267,11 @@ class _ServiceGalleryState extends State<_ServiceGallery> {
   @override
   Widget build(BuildContext context) {
     final photos = widget.service.images.isEmpty
-        ? <String>['', widget.service.id]
+        ? <String>['']
         : widget.service.images;
     final theme = Theme.of(context);
-    return AspectRatio(
-      aspectRatio: 16 / 10,
+    return SizedBox(
+      height: (MediaQuery.sizeOf(context).width * 0.625).clamp(200.0, 360.0),
       child: Stack(
         children: [
           PageView.builder(
@@ -386,6 +354,7 @@ class _BriefSheetState extends ConsumerState<_BriefSheet> {
   final _room = TextEditingController();
   String? _building;
   bool _aiBusy = false;
+  bool _sending = false;
 
   @override
   void initState() {
@@ -431,163 +400,205 @@ class _BriefSheetState extends ConsumerState<_BriefSheet> {
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
+    if (_sending) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_message.text.trim().length < 10) {
       showMessage('Add a little more detail so they can help.');
       return;
     }
-    Navigator.of(context).pop(
-      _BriefData(
-        message: _message.text.trim(),
-        phone: _phone.text.trim(),
-        building: _building ?? '',
-        roomNumber: _room.text.trim(),
-      ),
+    final data = _BriefData(
+      message: _message.text.trim(),
+      phone: _phone.text.trim(),
+      building: _building ?? '',
+      roomNumber: _room.text.trim(),
     );
+    setState(() => _sending = true);
+    try {
+      final uid = ref.read(currentUidProvider);
+      if (uid == null) return;
+      final profile = await ref.read(profileProvider.future);
+      if (profile.uid != uid) return;
+      await ref
+          .read(serviceRepositoryProvider)
+          .createRequest(
+            service: widget.service,
+            requesterId: uid,
+            requesterUsername: profile.username,
+            message: data.message,
+            phone: data.phone,
+            building: data.building,
+            roomNumber: data.roomNumber,
+          );
+      ref
+          .read(userRepositoryProvider)
+          .saveDeliveryDetails(
+            uid: uid,
+            phone: data.phone,
+            building: data.building,
+            roomNumber: data.roomNumber,
+          )
+          .catchError((Object _) {});
+      if (mounted) Navigator.of(context).pop(data);
+    } catch (error) {
+      // Keep the brief visible on failure so retry never loses the draft.
+      if (mounted) showError(error);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final insets = MediaQuery.of(context).viewInsets.bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, insets + 20),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'What do you need?',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'This brief goes straight to the provider, with your contact details.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 14),
-              TextFormField(
-                controller: _message,
-                minLines: 4,
-                maxLines: 8,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: context.tr('What do you need?'),
-                  hintText: context.tr(
-                    'e.g. I need 40 pages printed in colour and bound, ready by Thursday evening.',
+    return PopScope(
+      canPop: !_sending,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 4, 20, insets + 20),
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'What do you need?',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
-                  alignLabelWithHint: true,
                 ),
-                validator: (value) => (value ?? '').trim().length >= 10
-                    ? null
-                    : context.tr('Add a little more detail so they can help.'),
-              ),
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: AiAssistButton(
-                  label: 'Draft my brief',
-                  loading: _aiBusy,
-                  onPressed: _draft,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Icon(
-                    Icons.contact_phone_outlined,
-                    size: 18,
-                    color: theme.colorScheme.primary,
+                const SizedBox(height: 4),
+                Text(
+                  'This brief goes straight to the provider, with your contact details.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Your contact details',
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _message,
+                  minLines: 4,
+                  maxLines: 8,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: InputDecoration(
+                    labelText: context.tr('What do you need?'),
+                    hintText: context.tr(
+                      'e.g. I need 40 pages printed in colour and bound, ready by Thursday evening.',
                     ),
+                    alignLabelWithHint: true,
                   ),
-                  const Spacer(),
-                  Text(
-                    'Shared with provider',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _phone,
-                keyboardType: TextInputType.phone,
-                decoration: InputDecoration(
-                  labelText: context.tr('Phone'),
-                  hintText: '05xxxxxxxx',
-                ),
-                validator: (value) {
-                  final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
-                  return digits.length >= 8
+                  validator: (value) => (value ?? '').trim().length >= 10
                       ? null
-                      : context.tr('Enter a phone number');
-                },
-              ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<String>(
-                initialValue: _building,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: context.tr('Building'),
+                      : context.tr(
+                          'Add a little more detail so they can help.',
+                        ),
                 ),
-                items: [
-                  for (final building in AppConfig.hostelBuildings)
-                    DropdownMenuItem(
-                      value: building.code,
-                      child: Text(
-                        context.isArabic
-                            ? building.arabicLabel
-                            : building.englishLabel,
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: AiAssistButton(
+                    label: 'Draft my brief',
+                    loading: _aiBusy,
+                    onPressed: _sending ? null : _draft,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.contact_phone_outlined,
+                      size: 18,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Your contact details',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                ],
-                onChanged: (value) => setState(() => _building = value),
-                validator: (value) => value == null
-                    ? context.tr('Choose your building')
-                    : null,
-              ),
-              const SizedBox(height: 10),
-              TextFormField(
-                controller: _room,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: context.tr('Room number'),
-                  hintText: '214',
+                    const Spacer(),
+                    Text(
+                      'Shared with provider',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                validator: (value) => (value ?? '').trim().isEmpty
-                    ? context.tr('Enter your room number')
-                    : null,
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _submit,
-                icon: const Icon(Icons.send_outlined),
-                label: const Text('Send request'),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'You pay the provider directly when the work is done.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _phone,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Phone'),
+                    hintText: '05xxxxxxxx',
+                  ),
+                  validator: (value) {
+                    final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+                    return digits.length >= 8
+                        ? null
+                        : context.tr('Enter a phone number');
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: _building,
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Building'),
+                  ),
+                  items: [
+                    for (final building in AppConfig.hostelBuildings)
+                      DropdownMenuItem(
+                        value: building.code,
+                        child: Text(
+                          context.isArabic
+                              ? building.arabicLabel
+                              : building.englishLabel,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => setState(() => _building = value),
+                  validator: (value) =>
+                      value == null ? context.tr('Choose your building') : null,
+                ),
+                const SizedBox(height: 10),
+                TextFormField(
+                  controller: _room,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: context.tr('Room number'),
+                    hintText: '214',
+                  ),
+                  validator: (value) => (value ?? '').trim().isEmpty
+                      ? context.tr('Enter your room number')
+                      : null,
+                ),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: _sending || _aiBusy ? null : _submit,
+                  icon: _sending
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.send_outlined),
+                  label: const Text('Send request'),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'You pay the provider directly when the work is done.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

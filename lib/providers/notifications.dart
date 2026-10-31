@@ -17,3 +17,9 @@ final unreadNotificationCountProvider = Provider<int>((ref) {
   if (items == null) return 0;
   return items.where((item) => !item.read).length;
 });
+
+final unreadServiceNotificationCountProvider = Provider<int>((ref) {
+  return (ref.watch(notificationsProvider).value ?? const <AppNotification>[])
+      .where((item) => !item.read && item.isRequest)
+      .length;
+});

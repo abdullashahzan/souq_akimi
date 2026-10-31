@@ -23,10 +23,13 @@ class AppNotification {
     this.createdAt,
   });
 
-  /// `new_sale` is the only type that exists today; kept as a string so adding
-  /// service-request notifications later needs no migration.
+  /// Stable types also determine the destination when a notification is opened.
   static const String typeNewSale = 'new_sale';
   static const String typeServiceRequest = 'service_request';
+  static const String typeRequestAccepted = 'request_accepted';
+  static const String typeRequestDeclined = 'request_declined';
+  static const String typeRequestCancelled = 'request_cancelled';
+  static const String typeRequestCompleted = 'request_completed';
   static const String typeAnnouncement = 'announcement';
 
   final String id;
@@ -46,6 +49,22 @@ class AppNotification {
   final DateTime? createdAt;
 
   bool get isAnnouncement => type == typeAnnouncement;
+
+  bool get isRequest => requestId.isNotEmpty;
+
+  String get destination {
+    if (orderNumber.isNotEmpty) return '/sale/$orderNumber';
+    if (isRequest) {
+      final tab =
+          type == typeRequestAccepted ||
+              type == typeRequestDeclined ||
+              type == typeRequestCompleted
+          ? 'sent'
+          : 'received';
+      return '/requests?tab=$tab&request=$requestId';
+    }
+    return '/notifications';
+  }
 
   factory AppNotification.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) =>
       AppNotification.fromMap(doc.id, doc.data() ?? const {});

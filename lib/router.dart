@@ -1,5 +1,7 @@
 import 'package:souq_akimi/widgets/ui.dart';
+
 import 'core/l10n.dart';
+
 import 'package:go_router/go_router.dart';
 
 import 'features/admin/admin_screen.dart';
@@ -118,8 +120,7 @@ GoRouter createRouter() => GoRouter(
           path: '/sell',
           builder: (_, _) => const RequireAuth(
             title: 'Sell',
-            message:
-                'Sign in to list something — your listings stay attached to your account.',
+            message: 'Sign in to list something — your listings stay attached to your account.',
             child: SellScreen(),
           ),
           routes: [
@@ -127,8 +128,7 @@ GoRouter createRouter() => GoRouter(
               path: 'item',
               builder: (_, _) => const RequireAuth(
                 title: 'Sell an item',
-                message:
-                    'Sign in to list something — your listings stay attached to your account.',
+                message: 'Sign in to list something — your listings stay attached to your account.',
                 child: ProductFormScreen(),
               ),
             ),
@@ -148,10 +148,7 @@ GoRouter createRouter() => GoRouter(
             child: MyListingsScreen(),
           ),
         ),
-        GoRoute(
-          path: '/offer',
-          redirect: (_, _) => '/sell/service',
-        ),
+        GoRoute(path: '/offer', redirect: (_, _) => '/sell/service'),
         GoRoute(
           path: '/my-services',
           builder: (_, _) => const RequireAuth(

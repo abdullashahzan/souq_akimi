@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../core/app_config.dart';
 import '../../core/l10n.dart';
+import '../../core/souq_exception.dart';
 import '../../models/app_notification.dart';
 import '../../models/enums.dart';
 import '../../models/service.dart';
@@ -76,6 +77,9 @@ class ServiceRepository {
     required String building,
     required String roomNumber,
   }) async {
+    if (service.providerId == requesterId) {
+      throw SouqException(translate('You cannot request your own service.'));
+    }
     final ref = _requests.doc();
     final request = ServiceRequest(
       id: ref.id,
@@ -99,6 +103,12 @@ class ServiceRepository {
         .collection(Col.notifications)
         .doc();
     await _db.runTransaction<void>((txn) async {
+      final live = await txn.get(_services.doc(service.id));
+      if (!live.exists ||
+          live.data()?['isActive'] != true ||
+          live.data()?['providerId'] != service.providerId) {
+        throw SouqException(translate('This service is no longer available.'));
+      }
       final stamp = FieldValue.serverTimestamp();
       txn.set(ref, {...request.toMap(), 'createdAt': stamp});
       txn.set(inbox, <String, Object?>{
@@ -110,10 +120,7 @@ class ServiceRepository {
         'title': translate('New service request'),
         'body': translate(
           '{requester} requested "{service}".',
-          args: {
-            'requester': requesterUsername,
-            'service': service.title,
-          },
+          args: {'requester': requesterUsername, 'service': service.title},
         ),
         'orderNumber': '',
         'requestId': ref.id,
@@ -139,13 +146,66 @@ class ServiceRepository {
       .map((snap) => snap.docs.map(ServiceRequest.fromDoc).toList());
 
   /// The provider accepts or declines; the requester may only cancel.
-  Future<void> respond(String requestId, ServiceRequestStatus status) =>
-      _requests.doc(requestId).update({
-        'status': status.value,
-        'respondedAt': FieldValue.serverTimestamp(),
-      });
+  Future<void> respond(String requestId, ServiceRequestStatus status) {
+    if (status != ServiceRequestStatus.accepted &&
+        status != ServiceRequestStatus.declined &&
+        status != ServiceRequestStatus.completed) {
+      throw ArgumentError.value(status, 'status');
+    }
+    return _transition(requestId, status);
+  }
 
-  Future<void> cancel(String requestId) => _requests.doc(requestId).update({
-    'status': ServiceRequestStatus.cancelled.value,
-  });
+  Future<void> cancel(String requestId) =>
+      _transition(requestId, ServiceRequestStatus.cancelled);
+
+  Future<void> _transition(
+    String requestId,
+    ServiceRequestStatus status,
+  ) async {
+    final requestRef = _requests.doc(requestId);
+    await _db.runTransaction<void>((txn) async {
+      final snapshot = await txn.get(requestRef);
+      if (!snapshot.exists) {
+        throw SouqException(translate('That request no longer exists.'));
+      }
+      final request = ServiceRequest.fromDoc(snapshot);
+      final expected = status == ServiceRequestStatus.completed
+          ? ServiceRequestStatus.accepted
+          : ServiceRequestStatus.pending;
+      if (request.status != expected) {
+        throw SouqException(
+          translate('This request has already been updated.'),
+        );
+      }
+      final cancelled = status == ServiceRequestStatus.cancelled;
+      final recipient = cancelled ? request.providerId : request.requesterId;
+      final inbox = _db
+          .collection(Col.users)
+          .doc(recipient)
+          .collection(Col.notifications)
+          .doc('${requestId}_${status.value}');
+      final stamp = FieldValue.serverTimestamp();
+      txn.update(requestRef, {'status': status.value, 'respondedAt': stamp});
+      txn.set(inbox, {
+        'id': inbox.id,
+        'userId': recipient,
+        'actorId': cancelled ? request.requesterId : request.providerId,
+        'actorUsername': cancelled
+            ? request.requesterUsername
+            : request.providerUsername,
+        'type': 'request_${status.value}',
+        'title': switch (status) {
+          ServiceRequestStatus.accepted => 'Request accepted',
+          ServiceRequestStatus.declined => 'Request declined',
+          ServiceRequestStatus.completed => 'Request completed',
+          _ => 'Request cancelled',
+        },
+        'body': request.serviceTitle,
+        'orderNumber': '',
+        'requestId': requestId,
+        'read': false,
+        'createdAt': stamp,
+      });
+    });
+  }
 }

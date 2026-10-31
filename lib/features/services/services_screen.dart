@@ -11,6 +11,7 @@ import '../../providers/catalogue.dart';
 import '../../widgets/common.dart';
 import '../../widgets/language_button.dart';
 import '../../widgets/service_card.dart';
+import '../../widgets/notification_alerts.dart';
 
 /// Browse services other students offer: printouts, tutoring, delivery runs…
 class ServicesScreen extends ConsumerStatefulWidget {
@@ -101,6 +102,7 @@ class _ServicesScreenState extends ConsumerState<ServicesScreen> {
                     tooltip: context.tr('My requests'),
                     onTap: () => context.push('/requests'),
                   ),
+                  const InboxButton(),
                   const SizedBox(width: 8),
                   const LanguageButton(),
                 ],

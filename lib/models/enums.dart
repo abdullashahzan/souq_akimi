@@ -100,6 +100,7 @@ enum PriceType {
 enum ServiceRequestStatus {
   pending('pending', 'Pending'),
   accepted('accepted', 'Accepted'),
+  completed('completed', 'Completed'),
   declined('declined', 'Declined'),
   cancelled('cancelled', 'Cancelled');
 

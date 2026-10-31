@@ -1,5 +1,7 @@
 import 'package:souq_akimi/widgets/ui.dart';
+
 import '../../core/l10n.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -28,8 +30,7 @@ class OrderConfirmationScreen extends ConsumerWidget {
       ),
       body: Padding(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: ListView(
           children: [
             const SizedBox(height: 8),
             Container(
@@ -60,10 +61,7 @@ class OrderConfirmationScreen extends ConsumerWidget {
                   : order.items.length == 1
                   ? context.tr(
                       '{count} item · {total} cash on delivery',
-                      args: {
-                        'count': '1',
-                        'total': Format.money(order.total),
-                      },
+                      args: {'count': '1', 'total': Format.money(order.total)},
                     )
                   : context.tr(
                       '{count} items · {total} cash on delivery',
@@ -117,7 +115,7 @@ class OrderConfirmationScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(height: 24),
             FilledButton(
               onPressed: () => context.go('/order/$orderNumber'),
               child: const Text('View order'),

@@ -105,7 +105,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         final bytes = await file.readAsBytes();
         if (bytes.lengthInBytes > AppConfig.maxImageBytes) {
           if (mounted) {
-            showMessage('Skipped {name}: over 5 MB.', args: {'name': file.name});
+            showMessage(
+              'Skipped {name}: over 5 MB.',
+              args: {'name': file.name},
+            );
           }
           continue;
         }
@@ -113,9 +116,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       }
       if (!mounted) return;
       setState(() {
-        _images = [..._images, ...tokens].take(
-          AppConfig.galleryImagesPerListing,
-        ).toList();
+        _images = [
+          ..._images,
+          ...tokens,
+        ].take(AppConfig.galleryImagesPerListing).toList();
         _uploadedThisSession.addAll(tokens);
         _discardedImages.addAll(tokens.where((t) => !_images.contains(t)));
       });
@@ -213,10 +217,14 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
-    final username = ref.read(profileOrEmptyProvider).username;
 
     setState(() => _busy = true);
     try {
+      final profile = await ref.read(profileProvider.future);
+      if (profile.uid != uid) {
+        throw SouqException(translate('Please sign in again.'));
+      }
+      final username = profile.username;
       final tags = _tags.text
           .split(',')
           .map((t) => t.trim().toLowerCase())
@@ -429,10 +437,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   ],
                 ),
                 const SizedBox(height: 18),
-                Text(
-                  'Condition',
-                  style: theme.textTheme.titleSmall,
-                ),
+                Text('Condition', style: theme.textTheme.titleSmall),
                 const SizedBox(height: 6),
                 SegmentedButton<Condition>(
                   segments: [
@@ -455,8 +460,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                   const SizedBox(height: 10),
                   const SoftBanner(
                     icon: Icons.photo_outlined,
-                    text:
-                        'Listings with a clear cover photo sell much faster. Add up to six.',
+                    text: 'Listings with a clear cover photo sell much faster. Add up to six.',
                   ),
                 ],
                 const SizedBox(height: 24),

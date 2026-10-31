@@ -12,6 +12,7 @@ import '../../models/enums.dart';
 import '../../providers/catalogue.dart';
 import '../../widgets/common.dart';
 import '../../widgets/language_button.dart';
+import '../../widgets/notification_alerts.dart';
 import '../../widgets/product_card.dart';
 
 /// The catalogue home: a search entry point, quick filters and a grid of every
@@ -208,7 +209,7 @@ class _BrandHeader extends StatelessWidget {
           tooltip: context.tr('Search'),
           onTap: onSearch,
         ),
-        const SizedBox(width: 8),
+        const InboxButton(),
         const LanguageButton(),
         const SizedBox(width: 2),
       ],

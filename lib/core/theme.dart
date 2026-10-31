@@ -176,13 +176,16 @@ class AppTheme {
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
+        floatingLabelBehavior: FloatingLabelBehavior.always,
         filled: true,
         fillColor: isLight ? Colors.white : scheme.surfaceContainerHigh,
-        hintStyle: TextStyle(
+        hintStyle: textTheme.bodyLarge?.copyWith(
           color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
         ),
-        labelStyle: TextStyle(color: scheme.onSurfaceVariant),
-        floatingLabelStyle: TextStyle(
+        labelStyle: textTheme.bodyLarge?.copyWith(
+          color: scheme.onSurfaceVariant,
+        ),
+        floatingLabelStyle: textTheme.bodyLarge?.copyWith(
           color: scheme.primary,
           fontWeight: FontWeight.w700,
         ),

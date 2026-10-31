@@ -270,14 +270,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               TextFormField(
                 controller: _name,
                 textInputAction: TextInputAction.next,
-                decoration: InputDecoration(
-                  labelText: context.tr('Full name'),
-                ),
+                decoration: InputDecoration(labelText: context.tr('Full name')),
                 validator: (v) => (v ?? '').trim().length >= 2
                     ? null
-                    : context.tr(
-                        'Enter the name the seller should ask for',
-                      ),
+                    : context.tr('Enter the name the seller should ask for'),
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -305,9 +301,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _building,
-                decoration: InputDecoration(
-                  labelText: context.tr('Building'),
-                ),
+                decoration: InputDecoration(labelText: context.tr('Building')),
                 hint: Text(context.tr('Choose your hostel block')),
                 items: [
                   for (final building in AppConfig.hostelBuildings)
@@ -383,9 +377,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                             Text(
                               context.tr(
                                 'Pay {amount} in cash when the item is in your hands.',
-                                args: {
-                                  'amount': Format.money(draft.lineTotal),
-                                },
+                                args: {'amount': Format.money(draft.lineTotal)},
                               ),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant,

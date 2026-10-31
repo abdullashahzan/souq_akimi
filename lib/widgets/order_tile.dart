@@ -86,10 +86,7 @@ class OrderTile extends StatelessWidget {
                         args: {'address': order.deliveryAddress},
                       )
                     : '${Format.dateTime(order.createdAt)} · '
-                          '${context.tr(
-                            'to {address}',
-                            args: {'address': order.deliveryAddress},
-                          )}',
+                          '${context.tr('to {address}', args: {'address': order.deliveryAddress})}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.labelSmall?.copyWith(

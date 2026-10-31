@@ -98,6 +98,10 @@ service cloud.firestore {
           );
         }
 
+        function requestBefore(requestId) {
+          return get(/databases/$(database)/documents/serviceRequests/$(requestId));
+        }
+
         allow read, delete: if isSelf(uid) || isAdmin();
 
         allow create: if isSignedIn()
@@ -130,6 +134,31 @@ service cloud.firestore {
                    == request.auth.uid
               && requestAfter(request.resource.data.requestId).data.createdAt
                    == request.time
+            )
+            ||
+            // Request responses/cancellations are coupled to a single pending
+            // transition; replaying an old request cannot spam a recipient.
+            (
+              request.resource.data.actorId == request.auth.uid
+              && request.resource.data.requestId is string
+              && notificationId == request.resource.data.requestId + '_'
+                   + requestAfter(request.resource.data.requestId).data.status
+              && (requestBefore(request.resource.data.requestId).data.status == 'pending'
+                  || (requestBefore(request.resource.data.requestId).data.status == 'accepted'
+                      && requestAfter(request.resource.data.requestId).data.status == 'completed'))
+              && requestAfter(request.resource.data.requestId).data.respondedAt == request.time
+              && (
+                (request.resource.data.type in ['request_accepted', 'request_declined', 'request_completed']
+                  && request.auth.uid == requestBefore(request.resource.data.requestId).data.providerId
+                  && uid == requestBefore(request.resource.data.requestId).data.requesterId
+                  && request.resource.data.type == 'request_' + requestAfter(request.resource.data.requestId).data.status
+                  && requestAfter(request.resource.data.requestId).data.status in ['accepted', 'declined', 'completed'])
+                ||
+                (request.resource.data.type == 'request_cancelled'
+                  && request.auth.uid == requestBefore(request.resource.data.requestId).data.requesterId
+                  && uid == requestBefore(request.resource.data.requestId).data.providerId
+                  && requestAfter(request.resource.data.requestId).data.status == 'cancelled')
+              )
             )
             ||
             // The administrator broadcasting to every inbox.
@@ -221,6 +250,9 @@ service cloud.firestore {
         && request.resource.data.requesterId == request.auth.uid
         && request.resource.data.providerId is string
         && request.resource.data.providerId != ''
+        && request.resource.data.providerId != request.auth.uid
+        && get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.isActive == true
+        && get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.providerId == request.resource.data.providerId
         && request.resource.data.phone is string
         && request.resource.data.phone != ''
         && request.resource.data.building is string
@@ -230,17 +262,20 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt == request.time;
 
-      allow update: if isSignedIn() && (
+      allow update: if isSignedIn()
+        && request.resource.data.respondedAt == request.time && (
         // Provider may only accept or decline.
         (resource.data.providerId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['status', 'respondedAt'])
-          && request.resource.data.status in ['accepted', 'declined'])
+           && ((resource.data.status == 'pending' && request.resource.data.status in ['accepted', 'declined'])
+               || (resource.data.status == 'accepted' && request.resource.data.status == 'completed')))
         ||
         // Requester may only cancel.
         (resource.data.requesterId == request.auth.uid
+          && resource.data.status == 'pending'
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['status'])
+               .hasOnly(['status', 'respondedAt'])
           && request.resource.data.status == 'cancelled')
       );
 

@@ -116,8 +116,7 @@ class AuthRepository {
       'network-request-failed' =>
         'No connection. Check your network and try again.',
       'requires-recent-login' => 'Please sign in again to continue.',
-      'operation-not-allowed' ||
-      'account-exists-with-different-credential' =>
+      'operation-not-allowed' || 'account-exists-with-different-credential' =>
         'Google sign-in is not available for this account yet.',
       _ =>
         error.message?.trim().isNotEmpty == true

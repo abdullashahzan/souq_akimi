@@ -16,12 +16,13 @@ final visibleSellerIdsProvider = Provider<List<String>>((ref) {
       if (product.sellerId.isNotEmpty) product.sellerId,
     for (final service in services)
       if (service.providerId.isNotEmpty) service.providerId,
-  }.toList(growable: false)
-    ..sort();
+  }.toList(growable: false)..sort();
   return ids.take(30).toList(growable: false);
 });
 
-final visibleSellerProfilesProvider = StreamProvider<Map<String, AppUser>>((ref) {
+final visibleSellerProfilesProvider = StreamProvider<Map<String, AppUser>>((
+  ref,
+) {
   final ids = ref.watch(visibleSellerIdsProvider);
   if (ids.isEmpty) return Stream.value(const <String, AppUser>{});
   return ref.watch(userRepositoryProvider).watchMany(ids);
@@ -31,7 +32,9 @@ final visibleSellerProfilesProvider = StreamProvider<Map<String, AppUser>>((ref)
 final visibleSellerSalesProvider = Provider<Map<String, int>>((ref) {
   final profiles = ref.watch(visibleSellerProfilesProvider).value;
   if (profiles == null) return const {};
-  return {for (final entry in profiles.entries) entry.key: entry.value.salesCount};
+  return {
+    for (final entry in profiles.entries) entry.key: entry.value.salesCount,
+  };
 });
 
 /// A single seller's live public profile, for detail screens.

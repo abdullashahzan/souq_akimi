@@ -118,7 +118,10 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
         final bytes = await file.readAsBytes();
         if (bytes.lengthInBytes > AppConfig.maxImageBytes) {
           if (mounted) {
-            showMessage('Skipped {name}: over 5 MB.', args: {'name': file.name});
+            showMessage(
+              'Skipped {name}: over 5 MB.',
+              args: {'name': file.name},
+            );
           }
           continue;
         }
@@ -126,9 +129,10 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
       }
       if (!mounted) return;
       setState(() {
-        _images = [..._images, ...tokens].take(
-          AppConfig.galleryImagesPerListing,
-        ).toList();
+        _images = [
+          ..._images,
+          ...tokens,
+        ].take(AppConfig.galleryImagesPerListing).toList();
         _uploadedThisSession.addAll(tokens);
         _discardedImages.addAll(tokens.where((t) => !_images.contains(t)));
       });
@@ -209,10 +213,14 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final uid = ref.read(currentUidProvider);
     if (uid == null) return;
-    final username = ref.read(profileOrEmptyProvider).username;
 
     setState(() => _busy = true);
     try {
+      final profile = await ref.read(profileProvider.future);
+      if (profile.uid != uid) {
+        throw SouqException(translate('Please sign in again.'));
+      }
+      final username = profile.username;
       final tags = _tags.text
           .split(',')
           .map((t) => t.trim().toLowerCase())
