@@ -15,7 +15,8 @@ Automated layouts also cover 360px English and Arabic/RTL screens.
 - Registered `com.souqakimi.app` Firebase platform apps and a dedicated Android
   release certificate for Google OAuth. Production builds require private
   signing credentials, disable shared-key AI and exclude demo assets.
-- **63 rule tests passed**, including stored/count-limited OTP guesses,
+- **164 Flutter tests, 64 rule tests and 8 Python safety tests passed**, with
+  clean analysis. Rule regressions include stored/count-limited OTP guesses,
   transaction-bound stock movements, price/quantity checks, no free tally
   increments, profile privacy and previous admin/startup protections.
 - The historical QA notes below describe earlier development builds, not the

@@ -351,6 +351,8 @@ async function capture(db, { orderNumber, deliveryId, code, extra = {} }) {
       const snap = await tx.get(orderRef.collection('deliveries').doc(id));
       if (snap.exists) deliveries.push({ id, ...snap.data() });
     }
+    const profileRef = db.doc(`users/${deliveryId}`);
+    const profile = await tx.get(profileRef);
     assert.ok(orderSnap.exists);
     const status = deliveries.every((d) =>
       (d.id === deliveryId ? 'delivered' : d.status) === 'delivered',
@@ -365,6 +367,16 @@ async function capture(db, { orderNumber, deliveryId, code, extra = {} }) {
       ...extra,
     });
     tx.update(orderRef, { status });
+    tx.set(profileRef, {
+      salesCount: FieldValue.increment(1),
+      updatedAt: FieldValue.serverTimestamp(),
+      salesOrderId: orderNumber,
+      salesDeliveryId: deliveryId,
+    }, {merge:true});
+    tx.set(db.doc(`publicProfiles/${deliveryId}`), {
+      username: profile.data().username,
+      salesCount: (profile.data().salesCount ?? 0) + 1,
+    });
   });
 }
 
@@ -1166,6 +1178,16 @@ describe('public-release security regressions', () => {
   });
   it('a sales tally increment without a completed delivery is rejected', async () => {
     await assertFails(seller1().doc('users/seller1').set({salesCount:1,updatedAt:FieldValue.serverTimestamp()}, {merge:true}));
+  });
+  it('accepts a correct fifth guess with private and public sales-profile writes', async () => {
+    const id = await placeOrder(buyer(), {orderNumber:'FIFTH'});
+    for (let i=1;i<=4;i++) {
+      await assertFails(capture(seller1(), {orderNumber:'FIFTH',deliveryId:id,code:'00000'+i}));
+    }
+    await assertSucceeds(capture(seller1(), {orderNumber:'FIFTH',deliveryId:id,code:'123456'}));
+    assert.equal((await anon().doc('publicProfiles/seller1').get()).data().salesCount,1);
+    assert.equal((await seller1().doc('users/seller1').get()).data().salesCount,1);
+    await assertFails(capture(seller1(), {orderNumber:'FIFTH',deliveryId:id,code:'123456'}));
   });
 });
 
