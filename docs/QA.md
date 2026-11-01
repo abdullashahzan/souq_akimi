@@ -22,6 +22,23 @@ Automated layouts also cover 360px English and Arabic/RTL screens.
 - The historical QA notes below describe earlier development builds, not the
   current release inventory or signing/credential posture. See
   [release guide](releases.md) for install instructions and iOS limitations.
+- GitHub macOS build attempts reached native dependency resolution. Xcode 26.3
+  fixed the initial Swift tools mismatch, but Firebase SDK 13/AppCheck 12
+  conflicts with the locked Google Sign-In SDK 8/AppCheck 11. No broken unsigned
+  IPA is attached and no iOS device/runtime verification is claimed.
+- Final 68.0 MB APK verified with `apksigner`: dedicated RSA-4096 signer, valid
+  APK v2 signature, expected package/version and Android 7.0+ requirement.
+  Archive scan passed with SHA-256
+  `54f18f0b37a945084533400c40d960a504645f3b0de69b194c90642401c53ae3`.
+  Installed on `HA220ZY7` and checked new-install onboarding, actual Google login
+  to the existing administrator, admin overview, support/privacy dialog, manual
+  listing editor without AI controls, English/Arabic/RTL and cold restart.
+  No Flutter errors or Android crashes were found in the inspected final logs.
+- Final read-only live audit: 0 products/services/orders/requests/app-config/
+  announcement/audit/restriction documents, 1 original private admin profile,
+  1 safe public profile and 1 original image. The original private profile and
+  unrelated image exactly match the pre-cleanup baseline. No new test account,
+  listing or order was created. Tablet restored to English Browse.
 
 ## Administrator, welcome and launch-message follow-up
 

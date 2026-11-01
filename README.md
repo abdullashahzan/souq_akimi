@@ -17,8 +17,9 @@ The public package is `com.souqakimi.app`, signed with a dedicated release key.
 Development installs (`com.example.souq_akimi`) are separate apps: install the
 public app and sign in again; your Firebase account and real data remain the same.
 
-**iPhone/iPad:** an unsigned IPA, if included, requires personal Apple signing;
-it is **not** tap-to-install. See [release and iOS limits](docs/releases.md).
+**iPhone/iPad:** no installable iOS binary is included. The attempted macOS build
+found a native dependency conflict; Apple signing would also be required.
+GitHub downloads cannot bypass that. See [iOS limits](docs/releases.md#ios).
 
 The live demo catalogue and developer seeders are removed. An empty catalogue is
 intentional until users publish real listings. Automated tests stay in git, not

@@ -7,7 +7,7 @@ Download `Souq-Akimi-Android.apk` from the official GitHub Releases page, verify
 Disable that permission afterwards if desired. No store/payment account is
 needed. Future updates are manual downloads from this same repository.
 
-- **Souq Akimi 1.0.0 (2)**, package **com.souqakimi.app**.
+- **Souq Akimi 1.0.0 (2)**, package **com.souqakimi.app**, Android 7.0/API 24+.
 - Dedicated RSA-4096 release key, not debug signing.
 - Certificate SHA-1: `F4:82:44:B3:DC:9B:F6:B5:1C:13:61:0F:7C:59:2D:50:50:38:37:35`.
 - New Firebase Android/iOS registrations match the production identifiers.
@@ -55,11 +55,19 @@ from old development clients. Do not replace them with permissive rules.
 
 ## iOS
 
-GitHub's macOS runner can compile for physical iOS devices. The manual
-`iOS unsigned build` workflow packages `Payload/Runner.app` into an unsigned IPA.
-If attached to a release, its name remains **Souq-Akimi-iOS-unsigned.ipa**.
+**No iOS binary is published in this release.** Two builds were attempted on
+GitHub's macOS runner. Selecting Xcode 26.3 fixed the initial Swift tools issue,
+but the locked native packages still cannot resolve together: Firebase iOS SDK
+13 requires AppCheck 12 while Google Sign-In iOS SDK 8 requires AppCheck 11.
+An iOS dependency upgrade/migration and real-device testing remain necessary;
+the working Android release was not destabilized to force an unsigned artifact.
 
-**It is not directly installable on ordinary iPhones/iPads.** Opening it from
+The manual `iOS unsigned build` workflow is retained for future build diagnosis.
+It currently fails at that dependency boundary; it does **not** produce a usable
+IPA. Once dependencies are migrated, its packaging step can create an unsigned
+IPA, which must remain labelled **Souq-Akimi-iOS-unsigned.ipa** if ever attached.
+
+**An unsigned IPA is not directly installable on ordinary iPhones/iPads.** Opening it from
 Safari/Files does not install it. An experienced user needs their own Apple
 signing/provisioning and compatible personal-sideload tooling, or a developer
 needs Mac/Xcode and a provisioned device. Personal signatures expire and may
