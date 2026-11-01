@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'core/app_config.dart';
 import 'core/feedback.dart';
 import 'core/theme.dart';
+import 'core/motion.dart';
 import 'providers/locale.dart';
 import 'router.dart';
+import 'widgets/startup_gate.dart';
 
 /// The parsed route table. Kept in a provider so tests can swap it out.
 final routerProvider = Provider<GoRouter>((ref) => createRouter());
@@ -34,6 +36,7 @@ class SouqApp extends ConsumerWidget {
       // so a message survives the popup that triggered it closing.
       scaffoldMessengerKey: souqMessengerKey,
       theme: AppTheme.light(),
+      scrollBehavior: const SouqScrollBehavior(),
       darkTheme: AppTheme.dark(),
       // The product look is a white app on both platforms; a half-finished dark
       // theme would be worse than none, so the system preference is ignored
@@ -46,7 +49,7 @@ class SouqApp extends ConsumerWidget {
         return MediaQuery.withClampedTextScaling(
           minScaleFactor: 0.9,
           maxScaleFactor: 1.35,
-          child: child,
+          child: StartupGate(child: child),
         );
       },
       routerConfig: router,

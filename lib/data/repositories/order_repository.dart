@@ -152,6 +152,12 @@ class OrderRepository {
         );
       }
       final product = snap.data() ?? const <String, dynamic>{};
+      if (Codec.boolean(product['isDemo'])) {
+        throw const SouqException(
+          'Demo items are for browsing only and cannot be purchased.',
+          code: 'failed-precondition',
+        );
+      }
       final name = Codec.str(product['name'], 'This item');
       if (Codec.boolean(product['isActive']) != true) {
         throw SouqException(
@@ -236,7 +242,7 @@ class OrderRepository {
     final deliveriesCol = orderRef.collection(Col.deliveries);
     final secretsCol = orderRef.collection(Col.deliverySecrets);
     for (final sellerId in sellerIds) {
-      final deliveryRef = deliveriesCol.doc();
+      final deliveryRef = deliveriesCol.doc(sellerId);
       txn.set(deliveryRef, <String, Object>{
         'id': deliveryRef.id,
         'sellerId': sellerId,
@@ -264,7 +270,7 @@ class OrderRepository {
       final notificationRef = _users
           .doc(sellerId)
           .collection(Col.notifications)
-          .doc();
+          .doc('n-$orderNumber');
       txn.set(notificationRef, <String, Object>{
         'id': notificationRef.id,
         'userId': sellerId,
@@ -287,6 +293,7 @@ class OrderRepository {
         'stock': FieldValue.increment(-quantity),
         'soldCount': FieldValue.increment(quantity),
         'updatedAt': stamp,
+        'lastOrderId': orderNumber,
       });
     }
 
@@ -410,7 +417,7 @@ class OrderRepository {
             'createdAt': FieldValue.serverTimestamp(),
           });
         }
-        txn.update(deliveryRef, {'otpAttempts': 0});
+        txn.update(deliveryRef, {'otpAttempts': 0, 'pendingCode': ''});
       });
     });
   }
@@ -461,6 +468,20 @@ class OrderRepository {
       }
 
       final ids = await _deliveryIds(orderNumber);
+      // Consume a guess BEFORE asking the rules to compare it. Rejected writes
+      // cannot count attempts; storing the guess first prevents modified clients
+      // from brute-forcing the secret without spending their five attempts.
+      await _db.runTransaction<void>((txn) async {
+        final snap = await txn.get(deliveryRef);
+        final data = snap.data() ?? {};
+        final used = Codec.integer(data['otpAttempts']);
+        if (data['status'] != 'ready' || used >= 5) {
+          throw const SouqException(
+            'Too many incorrect codes. Ask the buyer to generate a new code.',
+          );
+        }
+        txn.update(deliveryRef, {'otpAttempts': used + 1, 'pendingCode': code});
+      });
       try {
         return await _db.runTransaction<String>((txn) async {
           final oSnap = await txn.get(orderRef);
@@ -471,6 +492,7 @@ class OrderRepository {
             );
           }
           final all = await _readDeliveries(txn, deliveryRef.parent, ids);
+          final sellerProfile = await txn.get(_users.doc(uid));
           Delivery? current;
           for (final candidate in all) {
             if (candidate.id == deliveryId) {
@@ -507,17 +529,27 @@ class OrderRepository {
           });
           txn.update(orderRef, {'status': status});
           // One completed delivery = one sale in the seller's public tally.
-          // `set(merge:)` also repairs a missing profile document.
+          // A newly completed delivery proves this increment to the rules.
           txn.set(_users.doc(uid), {
             'salesCount': FieldValue.increment(1),
             'updatedAt': stamp,
+            'salesOrderId': orderNumber,
+            'salesDeliveryId': deliveryId,
           }, SetOptions(merge: true));
+          txn.set(_db.collection(Col.publicProfiles).doc(uid), {
+            'username': sellerProfile.data()?['username'] ?? '',
+            'salesCount':
+                Codec.integer(sellerProfile.data()?['salesCount']) + 1,
+          });
           return status;
         });
       } on FirebaseException catch (error) {
         if (error.code != 'permission-denied') rethrow;
         // The rules rejected the code (or the delivery is no longer open).
-        final remaining = await _registerFailedAttempt(deliveryRef);
+        final latest = await deliveryRef.get();
+        final remaining = OrderMath.attemptsRemaining(
+          Codec.integer(latest.data()?['otpAttempts']),
+        );
         if (remaining <= 0) {
           throw const SouqException(
             'Too many incorrect codes. Ask the buyer to generate a new code.',
@@ -531,27 +563,6 @@ class OrderRepository {
         );
       }
     });
-  }
-
-  /// Records a failed guess and returns how many tries are left. Runs as its
-  /// own transaction so the increment survives even though the caller then
-  /// throws.
-  Future<int> _registerFailedAttempt(
-    DocumentReference<Map<String, dynamic>> deliveryRef,
-  ) async {
-    try {
-      return await _db.runTransaction<int>((txn) async {
-        final snap = await txn.get(deliveryRef);
-        if (!snap.exists) return 0;
-        final used = Codec.integer(snap.data()?['otpAttempts']);
-        final next = used + 1;
-        txn.update(deliveryRef, {'otpAttempts': next});
-        return OrderMath.attemptsRemaining(next);
-      });
-    } on FirebaseException {
-      // Already at the limit — the rules refuse a sixth attempt.
-      return 0;
-    }
   }
 
   /// Buyer-only: cancel an order that has not been delivered yet, returning
@@ -607,6 +618,7 @@ class OrderRepository {
           txn.update(entry.ref, {
             'stock': FieldValue.increment(entry.qty),
             'updatedAt': stamp,
+            'lastOrderId': orderNumber,
           });
         }
         txn.update(orderRef, {'status': 'cancelled'});

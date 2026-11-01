@@ -4,6 +4,7 @@ class Col {
   const Col._();
 
   static const String users = 'users';
+  static const String publicProfiles = 'publicProfiles';
   static const String products = 'products';
   static const String services = 'services';
   static const String serviceRequests = 'serviceRequests';

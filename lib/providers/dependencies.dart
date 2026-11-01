@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../data/ai_assistant.dart';
 import '../data/repositories/admin_repository.dart';
 import '../data/repositories/auth_repository.dart';
-import '../data/repositories/demo_seeder.dart';
 import '../data/repositories/order_repository.dart';
 import '../data/repositories/product_repository.dart';
 import '../data/repositories/image_store.dart';
@@ -40,7 +39,6 @@ final imageStoreProvider = Provider<ImageStore>((ref) => ImageStore());
 
 /// Writes the sample catalogue straight into Firestore (there are no Cloud
 /// Functions on the Spark plan to do it server-side any more).
-final demoSeederProvider = Provider<DemoSeeder>((ref) => DemoSeeder());
 
 final orderRepositoryProvider = Provider<OrderRepository>(
   (ref) => OrderRepository(),

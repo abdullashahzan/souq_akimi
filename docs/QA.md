@@ -3,6 +3,112 @@
 Test device: Android tablet `HA220ZY7`. No Android emulator was used.
 Automated layouts also cover 360px English and Arabic/RTL screens.
 
+## GitHub public-release preparation — 2026-11-01
+
+- Removed the ten known live demo products and ten corresponding images, the
+  explicitly labelled QA announcement and both confirmed QA audit records.
+  Timestamp preconditions and private before/after comparisons preserved all
+  unrelated documents. The original admin profile/image remain; no real orders,
+  requests or services were deleted. Seeders and bundled demo photos are gone.
+- Published only username/sales count to `publicProfiles`. Private contact
+  documents are now owner/admin-only; public seller widgets read safe profiles.
+- Registered `com.souqakimi.app` Firebase platform apps and a dedicated Android
+  release certificate for Google OAuth. Production builds require private
+  signing credentials, disable shared-key AI and exclude demo assets.
+- **63 rule tests passed**, including stored/count-limited OTP guesses,
+  transaction-bound stock movements, price/quantity checks, no free tally
+  increments, profile privacy and previous admin/startup protections.
+- The historical QA notes below describe earlier development builds, not the
+  current release inventory or signing/credential posture. See
+  [release guide](releases.md) for install instructions and iOS limitations.
+
+## Administrator, welcome and launch-message follow-up
+
+- Added searchable user access moderation with self/admin protection, required
+  reasons and typed removal confirmation; content edits; maintenance controls;
+  order/request inspection; and immutable recent audit entries.
+- Marketplace removal retains order/request history and a permanent UID
+  restriction. Firebase login deletion remains a separate trusted IAM operation
+  (`scripts/delete_auth_user.py`), not an in-app Admin SDK credential.
+- Full launch messages cover the root router before onboarding; publication,
+  replacement, withdrawal, every-open/once-per-device policies, guest/new-user
+  reach, account-scoped acknowledgements and background/resume are tested.
+- Four-step English/Arabic onboarding persists locally and on authenticated
+  profiles. Language controls also work above the root Navigator. Fixed form
+  controller disposal to wait until dialog exit animations have completed.
+- **165 Flutter tests**, **56 Firestore-rule tests**, **7 Python safety tests**
+  passed; clean analysis. Rule tests cover ban/recreation/privilege-spoofing,
+  maintenance, public-message authorization, immutable audit records and
+  multi-line/forged-seller checkout bypasses. No destructive user-removal test
+  was run against the existing administrator or ten live demo products.
+- Deployed the updated Firestore rules. On `HA220ZY7`, completed the four-step
+  welcome flow, switched English/Arabic, checked Back/Next, verified protected
+  administrator actions, inspected the new tabs and opened/cancelled a content
+  edit without saving. Published a clearly labelled temporary QA launch message:
+  it covered the entire app, switched language, and reappeared after an actual
+  background/resume and cold start. Withdrew it afterwards. Its immutable history
+  and two publication/withdrawal audit entries are intentionally retained.
+- Post-test live inventory: **10 products, 11 images, 1 profile, 0 services,
+  orders or service requests**; no user restrictions or maintenance. All ten
+  active demo titles/stock match the manifest and their photo bytes match bundled
+  assets. The administrator remains `shahzan`; completing onboarding saved the
+  profile's completion flag. The earlier temporary baseline was unavailable at
+  final audit, so this check does not claim a full document-by-document comparison.
+- Tablet testing also prompted an in-place localization dependency fix for
+  tooltips and field decorations, plus Arabic service-request labels.
+- Final 69.0 MB release APK rebuilt and installed on `HA220ZY7`; verified the
+  in-place Arabic admin tooltip/activity labels, withdrawn announcement and
+  English Browse with ten demos. No Flutter errors or Android crashes in the
+  final-run logs. Source changes remain uncommitted/unpushed.
+
+See [administrator guide](admin-controls.md) for operation and deployment limits.
+
+## Motion and photo-viewer follow-up
+
+- Bounded spring press/release feedback, rounded button morphing, sliding tab
+  selection, fluid RTL-aware Android page entry and bouncy edge scrolling.
+- Full-screen photo previews from cards, product/service galleries, listing
+  form photos, checkout and administrator thumbnails. Listing text/navigation
+  and photo-removal controls keep their existing actions.
+- Pinch, double-tap-at-focal-point, zoom/reset, zoomed panning, six-photo paging,
+  explicit previous/next controls and last-page restoration on close.
+- Reduced-motion behavior, native Apple page/back gestures, keyboard Escape/
+  arrows, Android back, readable dark viewer chrome and Arabic controls.
+- Added 18 motion/photo tests; the full Flutter suite is now **148 tests**.
+  The seeder's three offline safety tests remain unchanged. No Firestore rules,
+  business workflows, credentials, demo stock or existing records were changed
+  to implement these UI interactions.
+- Built the release APK (68.2 MB) and installed it on `HA220ZY7`. Verified card
+  photo enlargement above the tab shell, zoom/pan, double-tap reset, Android back,
+  separate listing-title navigation, detail-gallery enlargement, tab navigation
+  and Arabic viewer controls. Restored English Browse with all ten demos visible.
+  Tablet logs contained no Flutter errors or Android crashes. Multi-photo paging
+  and two-finger pinch are covered by widget tests without changing live photos.
+
+## UI redesign follow-up — 2026-10-31
+
+- Editorial Browse masthead, real photo collage, category shortcuts, inset
+  product covers, calmer selling cards and a single scrolling Services page.
+- Verified the English and Arabic/RTL redesign on `HA220ZY7`, including the
+  category controls, service shortcut, selling choices and disabled demo buy bar.
+- Added 15 regression tests: total Flutter suite **130 passed**, with clean
+  analysis. Three offline seeder tests cover preview, collision refusal and
+  atomic create-only writes. Existing Firestore rules were not changed.
+- The live baseline at the start of this follow-up had **0 products, 0 services,
+  1 image and 1 profile**. It differs from the historical baseline below; no
+  attempt was made to recreate missing earlier documents.
+- Created exactly **10 demo products and 10 matching image documents**. A
+  private baseline comparison confirmed that the pre-existing profile and image
+  contents were unchanged. No accounts, services, orders or requests were added.
+- Demo items are visibly labelled and blocked from checkout by the updated
+  client. Existing real listings default to `isDemo: false`; edits preserve the
+  demo flag. This does not claim additional server-side transaction enforcement.
+- A second seeding attempt safely refused without writes or overwriting the
+  private backup. Samples remain in the catalogue as requested, not cleaned up
+  like the earlier temporary buyer/seller test data.
+
+See [design and sample-data notes](design.md) for photo sources and document IDs.
+
 ## Exercised flows
 
 - Registered two temporary accounts using the app, one buyer and one seller.

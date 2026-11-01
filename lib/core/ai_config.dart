@@ -1,20 +1,18 @@
-/// Optional build-time overrides.
-///
-/// The Groq key is supplied at build time with
-/// `--dart-define-from-file=dart_defines.json` (or `--dart-define`). It is
-/// intentionally not committed: a client-side key is extractable from any APK,
-/// and a leaked key should be rotated rather than published. For a larger
-/// deployment, move the call behind a proxy.
+import 'package:flutter/foundation.dart' show kReleaseMode;
+
+/// Debug-only AI configuration. Release builds never accept a shared API key.
+/// Restore public AI only behind a separately approved authenticated backend.
 class AiConfig {
   const AiConfig._();
 
   /// `--dart-define=GROQ_API_KEY=...` supplies the key. Empty in a plain
   /// checkout, which makes the AI buttons show the friendly "not configured"
   /// message instead of crashing.
-  static const String groqApiKey = String.fromEnvironment(
-    'GROQ_API_KEY',
-    defaultValue: '',
-  );
+  static const String groqApiKey = kReleaseMode
+      ? ''
+      : String.fromEnvironment('GROQ_API_KEY', defaultValue: '');
+
+  static const bool enabled = !kReleaseMode && groqApiKey != '';
 
   static const String groqEndpoint =
       'https://api.groq.com/openai/v1/chat/completions';

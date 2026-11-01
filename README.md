@@ -5,12 +5,24 @@ get everything delivered to your room. Flutter (iOS + Android) on Firebase
 (Auth + Firestore). **Cash on delivery only** — the app never touches a card, a
 wallet or a payment provider.
 
-## Preview
+## Download
 
-<img src="docs/screenshots/browse_ar.png" width="310" alt="Arabic Browse screen with the corrected Souq Akimi brand and floating navigation"> <img src="docs/screenshots/sell_ar.png" width="310" alt="Arabic Sell screen offering a product or a service">
+**[Download the Android APK from GitHub Releases](https://github.com/abdullashahzan/souq_akimi/releases/latest)**
 
-Screenshots from the release app on the Android tablet. The empty catalogue is
-intentional: launch data contains no demo listings.
+Install only `Souq-Akimi-Android.apk` from this repository. Compare its SHA-256
+with `SHA256SUMS.txt`, open it and approve Android's per-browser install permission.
+Updates are downloaded manually from the same Releases page. No store submission.
+
+The public package is `com.souqakimi.app`, signed with a dedicated release key.
+Development installs (`com.example.souq_akimi`) are separate apps: install the
+public app and sign in again; your Firebase account and real data remain the same.
+
+**iPhone/iPad:** an unsigned IPA, if included, requires personal Apple signing;
+it is **not** tap-to-install. See [release and iOS limits](docs/releases.md).
+
+The live demo catalogue and developer seeders are removed. An empty catalogue is
+intentional until users publish real listings. Automated tests stay in git, not
+in the APK. See [design notes](docs/design.md).
 
 ---
 
@@ -27,7 +39,9 @@ intentional: launch data contains no demo listings.
 | **Services** | Requests (accept / decline / cancel / complete), saved building/room/mobile details, live inbox alerts and two-way status notifications |
 | **Account** | Email/password and Google sign-in, profile, delivery defaults, completed-sales tally, order + sale history, sign out |
 | **Languages** | Persisted English/Arabic switch, Arabic RTL layout and Cairo typography |
-| **AI helpers** | Groq drafts product/service descriptions, search tags, service briefs and admin announcements |
+| **Motion & photos** | Springy press feedback, fluid page/tab transitions, bouncy scrolling, full-screen photo previews with pinch/double-tap zoom and six-photo paging; reduced-motion support |
+| **Owner controls & welcome** | User suspension/removal, content editing/moderation, maintenance controls, activity/audit inspection, first-run onboarding and full launch announcements; see [admin guide](docs/admin-controls.md) for the Auth-deletion boundary |
+| **Drafting** | Manual forms; shared-key AI is intentionally disabled/hidden in public releases |
 | **Admin** | Verified-email dashboard, inspect/pause/resume/remove listings, and confirmed in-app broadcasts |
 
 Every screen inside the app keeps the bottom navigation bar visible, and every
@@ -49,9 +63,9 @@ Browse.
 3. **The seller sees the badge** on the Orders tab (and in Profile → Notifications).
 4. **The seller delivers to the room on the order**, collects the cash, asks the
    buyer for their 6-digit code and types it into *My sales*.
-5. **Delivery complete.** The rules compare the typed code with
-   `deliverySecrets`, a document **the seller cannot read**. Five wrong guesses
-   lock the seller out; the buyer can mint a new code.
+5. **Delivery complete.** Each guess consumes an attempt before comparison with
+   buyer-only `deliverySecrets`. A modified client cannot bypass the five-guess
+   limit; the buyer can rotate the code and reset attempts.
 6. **Cancelling.** Before delivery the buyer can cancel: every leg is cancelled
    and the stock goes back on sale. After delivery there is nothing to refund —
    cash already changed hands in person.
@@ -71,15 +85,24 @@ transaction, and `firestore.rules` is the trust layer. The rules enforce:
   stock must all move in the *same* transaction (`getAfter()` on siblings).
 - **Proof of delivery** — a seller may only flip a delivery to `delivered` by
   sending the code that matches the unreadable `deliverySecrets` document.
-- **Attempt limit** — a failed guess commits nothing; the counter may only
-  increase by one, to a maximum of five.
+- **Attempt limit** — a stored guess consumes an attempt before comparison;
+  changing a guess without incrementing the counter is rejected.
 - **Ownership** — only the buyer cancels or rotates codes; only participants can
-  read an order; inboxes are private to their owner.
-- **Stock counters** — a stranger may only move `stock` + `soldCount` together
-  (bounded to 999), so they can never reprice, deactivate or delete a listing.
+  operate a delivery. The administrator can inspect order/request records;
+  inboxes are private to their owner and administrator.
+- **Stock counters** — buyer movements require `lastOrderId` proving a new order
+  or one-time cancellation in the same transaction. Prices, quantities,
+  delivery/secret/notification siblings and summary status are checked.
+- **Profile privacy** — contact profiles are owner/admin-only; `publicProfiles`
+  contains only usernames and completed-sale counts. Tally increments require a
+  newly completed delivery, rather than trusting client increments.
 - **Image budget** — listing photos stored in Firestore are capped at 640 KB.
+- **Owner moderation** — verified-admin-only restrictions, protected admin UID,
+  immutable audit/history entries, public startup announcements and maintenance
+  controls. Restricted accounts cannot recreate removed profiles or bypass the
+  cartless checkout's seller/demo/active-listing checks.
 
-`rules-tests/` exercises the security rules against the Firestore emulator (43 tests).
+`rules-tests/` exercises the security rules against the Firestore emulator.
 
 ### Request notifications
 
@@ -102,10 +125,10 @@ transaction, and `firestore.rules` is the trust layer. The rules enforce:
 
 See [buyer/seller/admin verification](docs/QA.md) for the latest exercised flows.
 
-Known limitation: Firestore rules cannot see *which* order a stock write belongs
-to, so any signed-in user can nudge a listing's `stock`/`soldCount` within the
-bounded rule. Closing that completely needs server-side writes (Blaze) or App
-Check. See `docs/firestore_schema.md` for the full threat model.
+The release closes the old standalone stock/tally and profile-access boundaries.
+This is still a Spark-only community app: no guaranteed background push,
+server-side abuse throttling or automatic updates. Public availability does not
+mean store certification or unlimited Firebase quotas.
 
 ---
 
@@ -143,7 +166,7 @@ docs/firestore_schema.md      # data model + threat model
 ```bash
 flutter pub get
 cp dart_defines.example.json dart_defines.json
-# Edit dart_defines.json locally with your Groq key; never commit it.
+# Optional debug-only AI key. Never publish a keyed development build.
 flutter run --dart-define-from-file=dart_defines.json
 ```
 
@@ -163,8 +186,10 @@ Photos are resized on-device and stored as base64 in the `images` collection.
 ### AI configuration
 
 The app calls Groq's OpenAI-compatible API using `qwen/qwen3.8-27b`.
-`GROQ_API_KEY` is read only from a build-time define. A checkout without a key
-still runs, but AI actions report that they are not configured.
+`GROQ_API_KEY` is accepted in debug builds only. Releases hard-disable shared-key
+AI and hide its controls, even if a define is supplied accidentally. Public AI
+needs a separately approved authenticated/rate-limited backend; GitHub Releases
+cannot keep an API key secret or serve as that backend.
 
 The previous `gpt-oss-120b` configuration used a 180–280 token budget, which
 could be exhausted by reasoning before any visible answer was returned. The
@@ -202,13 +227,13 @@ cd rules-tests && npm test                     # Firestore rules on the emulator
 Build and install a release APK:
 
 ```bash
-flutter build apk --release --dart-define-from-file=dart_defines.json
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+python3 scripts/build_release.py
+adb -s YOUR_ANDROID_SERIAL install -r build/app/outputs/flutter-apk/app-release.apk
 ```
 
-Use JDK 17 for the Android build. Release currently uses debug signing; configure
-a private upload keystore and register its SHA-1 in Firebase/Google OAuth before
-publishing to an app store. This repository does not include a signing key.
+Use JDK 17. Release builds require external signing credentials and never fall
+back to debug signing. The release SHA-1 is registered in Firebase/Google OAuth.
+No signing key or Groq credential is included. See [release guide](docs/releases.md).
 
 ### Manual check-list
 

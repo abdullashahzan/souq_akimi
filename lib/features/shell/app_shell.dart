@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/app_config.dart';
 import '../../core/l10n.dart';
+import '../../core/motion.dart';
 import '../../providers/auth.dart';
 import '../../providers/locale.dart';
 import '../../providers/notifications.dart';
@@ -163,18 +164,42 @@ class _SouqBottomNav extends StatelessWidget {
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    child: _NavButton(
-                      item: items[i],
-                      selected: selectedIndex == i,
-                      badge: i == 1 ? serviceBadge : (i == 3 ? orderBadge : 0),
-                      onTap: () => onSelected(i),
+            child: LayoutBuilder(
+              builder: (context, constraints) => Stack(
+                children: [
+                  AnimatedPositionedDirectional(
+                    duration: Motion.reduced(context)
+                        ? Duration.zero
+                        : Motion.slow,
+                    curve: Motion.spring,
+                    start: constraints.maxWidth * selectedIndex / items.length,
+                    width: constraints.maxWidth / items.length,
+                    top: 0,
+                    bottom: 0,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: 0.09),
+                        borderRadius: BorderRadius.circular(22),
+                      ),
                     ),
                   ),
-              ],
+                  Row(
+                    children: [
+                      for (var i = 0; i < items.length; i++)
+                        Expanded(
+                          child: _NavButton(
+                            item: items[i],
+                            selected: selectedIndex == i,
+                            badge: i == 1
+                                ? serviceBadge
+                                : (i == 3 ? orderBadge : 0),
+                            onTap: () => onSelected(i),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -207,70 +232,73 @@ class _NavButton extends StatelessWidget {
       button: true,
       selected: selected,
       label: item.label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          decoration: BoxDecoration(
-            color: selected && !item.prominent
-                ? scheme.primary.withValues(alpha: 0.09)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(22),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  gradient: item.prominent
-                      ? const LinearGradient(
-                          colors: [Color(0xFF0B5D4B), Color(0xFF14897A)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        )
-                      : null,
-                  color: item.prominent ? null : Colors.transparent,
-                  borderRadius: BorderRadius.circular(13),
-                  boxShadow: item.prominent
-                      ? const [
-                          BoxShadow(
-                            color: Color(0x330B5D4B),
-                            blurRadius: 14,
-                            offset: Offset(0, 6),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Badge(
-                  isLabelVisible: badge > 0,
-                  label: Text('$badge'),
-                  backgroundColor: scheme.error,
-                  child: Icon(
-                    icon,
-                    size: 23,
-                    color: item.prominent ? Colors.white : foreground,
+      child: PressableScale(
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: AnimatedContainer(
+            duration: Motion.reduced(context) ? Duration.zero : Motion.medium,
+            curve: Curves.easeOutCubic,
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: item.prominent
+                        ? const LinearGradient(
+                            colors: [Color(0xFF0B5D4B), Color(0xFF14897A)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          )
+                        : null,
+                    color: item.prominent ? null : Colors.transparent,
+                    borderRadius: BorderRadius.circular(13),
+                    boxShadow: item.prominent
+                        ? const [
+                            BoxShadow(
+                              color: Color(0x330B5D4B),
+                              blurRadius: 14,
+                              offset: Offset(0, 6),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Badge(
+                    isLabelVisible: badge > 0,
+                    label: Text('$badge'),
+                    backgroundColor: scheme.error,
+                    child: MotionSwitcher(
+                      child: Icon(
+                        icon,
+                        key: ValueKey(icon),
+                        size: 23,
+                        color: item.prominent ? Colors.white : foreground,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                item.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelSmall?.copyWith(
-                  color: item.prominent ? scheme.primary : foreground,
-                  fontWeight: selected || item.prominent
-                      ? FontWeight.w800
-                      : FontWeight.w600,
-                  fontSize: 10.5,
+                const SizedBox(height: 2),
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: item.prominent ? scheme.primary : foreground,
+                    fontWeight: selected || item.prominent
+                        ? FontWeight.w800
+                        : FontWeight.w600,
+                    fontSize: 10.5,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -7,6 +7,7 @@ import '../models/enums.dart';
 import '../models/service.dart';
 import '../providers/sellers.dart';
 import 'listing_image.dart';
+import 'listing_gallery.dart';
 
 /// Icon shown for each service category in list rows and the filter sheet.
 IconData serviceCategoryIcon(ServiceCategory category) => switch (category) {
@@ -65,10 +66,14 @@ class ServiceCard extends ConsumerWidget {
                       width: 88,
                       height: 88,
                       child: service.coverImage.isNotEmpty
-                          ? ListingImage(
-                              url: service.coverImage,
+                          ? PhotoPreview(
+                              images: service.images,
                               label: service.title,
-                              seed: service.id,
+                              child: ListingImage(
+                                url: service.coverImage,
+                                label: service.title,
+                                seed: service.id,
+                              ),
                             )
                           : Container(
                               decoration: BoxDecoration(

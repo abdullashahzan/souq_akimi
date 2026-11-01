@@ -21,6 +21,7 @@ class Product {
     required this.images,
     required this.viewsCount,
     required this.soldCount,
+    this.isDemo = false,
     this.createdAt,
     this.updatedAt,
     this.searchText = '',
@@ -39,6 +40,7 @@ class Product {
   final Condition condition;
   final int stock;
   final bool isActive;
+  final bool isDemo;
 
   /// Download URLs; the first is the cover.
   final List<String> images;
@@ -80,6 +82,7 @@ class Product {
     condition: Condition.from(data['condition']),
     stock: Codec.integer(data['stock']),
     isActive: Codec.boolean(data['isActive'], true),
+    isDemo: Codec.boolean(data['isDemo']),
     images: Codec.strings(data['images']),
     viewsCount: Codec.integer(data['viewsCount']),
     soldCount: Codec.integer(data['soldCount']),
@@ -103,6 +106,7 @@ class Product {
       'condition': condition.value,
       'stock': stock,
       'isActive': isActive,
+      'isDemo': isDemo,
       'images': images,
       'coverImage': coverImage,
       'viewsCount': viewsCount,
@@ -134,6 +138,7 @@ class Product {
     condition: condition ?? this.condition,
     stock: stock ?? this.stock,
     isActive: isActive ?? this.isActive,
+    isDemo: isDemo,
     images: images ?? this.images,
     viewsCount: viewsCount ?? this.viewsCount,
     soldCount: soldCount ?? this.soldCount,

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/repositories/image_store.dart';
 import '../providers/images.dart';
+import '../core/motion.dart';
 
 /// A listing photo with a graceful fallback.
 ///
@@ -74,7 +75,7 @@ class ListingImage extends ConsumerWidget {
     return CachedNetworkImage(
       imageUrl: url,
       fit: fit,
-      fadeInDuration: const Duration(milliseconds: 150),
+      fadeInDuration: Motion.reduced(context) ? Duration.zero : Motion.fast,
       placeholder: (context, _) => _placeholder(context),
       errorWidget: (context, _, _) => _fallback(context),
     );

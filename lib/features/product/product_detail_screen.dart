@@ -12,7 +12,8 @@ import '../../core/l10n.dart';
 import '../../providers/orders.dart';
 import '../../providers/sellers.dart';
 import '../../widgets/common.dart';
-import '../../widgets/listing_image.dart';
+import '../../widgets/ai_button.dart';
+import '../../widgets/listing_gallery.dart';
 import '../../widgets/product_card.dart';
 import '../auth/require_auth.dart';
 
@@ -29,15 +30,7 @@ class ProductDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
-  final _pageController = PageController();
-  int _page = 0;
   bool _countedView = false;
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,9 +62,6 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           ref.read(productRepositoryProvider).recordView(product.id);
         }
 
-        final photos = product.images.isNotEmpty
-            ? product.images
-            : <String>[''];
         final related = ref.watch(relatedProductsProvider(product.id));
         final isOwner = product.isOwnedBy(ref.watch(currentUidProvider) ?? '');
         final seller = ref.watch(sellerProfileProvider(product.sellerId)).value;
@@ -100,65 +90,25 @@ class _ProductDetailScreenState extends ConsumerState<ProductDetailScreen> {
           body: ListView(
             padding: const EdgeInsets.only(bottom: 24),
             children: [
-              LayoutBuilder(
-                builder: (context, constraints) => SizedBox(
-                  height: (constraints.maxWidth * 0.75).clamp(200.0, 360.0),
-                  child: Stack(
-                    children: [
-                      // Flies in from the card's cover (see [productHeroTag]).
-                      Hero(
-                        tag: productHeroTag(product.id),
-                        child: PageView.builder(
-                          controller: _pageController,
-                          itemCount: photos.length,
-                          onPageChanged: (index) =>
-                              setState(() => _page = index),
-                          itemBuilder: (context, index) => ListingImage(
-                            url: photos[index],
-                            label: product.name,
-                            // Page 0 uses the same tint seed as the card cover so
-                            // a photo-less listing does not flicker colour mid
-                            // flight.
-                            seed: index == 0
-                                ? product.id
-                                : '${product.id}-$index',
-                          ),
-                        ),
-                      ),
-                      if (photos.length > 1)
-                        PositionedDirectional(
-                          bottom: 10,
-                          start: 0,
-                          end: 0,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              for (var i = 0; i < photos.length; i++)
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  margin: const EdgeInsets.symmetric(
-                                    horizontal: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: i == _page
-                                        ? Colors.white
-                                        : Colors.white.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+              ListingGallery(
+                key: ValueKey(product.id),
+                images: product.images,
+                label: product.name,
+                seed: product.id,
+                heroTag: productHeroTag(product.id),
               ),
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (product.isDemo) ...[
+                      const SoftBanner(
+                        icon: Icons.science_outlined,
+                        text: 'Demo items are for browsing only and cannot be purchased.',
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -325,7 +275,11 @@ class _BuyBar extends ConsumerWidget {
                 ),
               ),
             ),
-            if (isOwner)
+            if (product.isDemo)
+              const Expanded(
+                child: FilledButton(onPressed: null, child: Text('Demo item')),
+              )
+            else if (isOwner)
               Expanded(
                 child: FilledButton(
                   onPressed: () => context.push('/product/${product.id}/edit'),

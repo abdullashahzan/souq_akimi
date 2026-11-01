@@ -29,7 +29,7 @@ class UserRepository {
     if (uids.isEmpty) return Stream.value(const {});
     final ids = uids.take(30).toList(growable: false);
     return _db
-        .collection(Col.users)
+        .collection(Col.publicProfiles)
         .where(FieldPath.documentId, whereIn: ids)
         .snapshots()
         .map(
@@ -39,6 +39,12 @@ class UserRepository {
           },
         );
   }
+
+  Stream<AppUser> watchPublic(String uid) => _db
+      .collection(Col.publicProfiles)
+      .doc(uid)
+      .snapshots()
+      .map((doc) => AppUser.fromMap(uid, doc.data() ?? {}));
 
   Future<AppUser?> get(String uid) async {
     final snap = await _userRef(uid).get();
@@ -56,8 +62,15 @@ class UserRepository {
   }) async {
     final ref = _userRef(uid);
     final snap = await ref.get();
-    if (snap.exists) return;
-    await ref.set({
+    if (snap.exists) {
+      await _db.collection(Col.publicProfiles).doc(uid).set({
+        'username': snap.data()?['username'] ?? username,
+        'salesCount': snap.data()?['salesCount'] ?? 0,
+      });
+      return;
+    }
+    final batch = _db.batch();
+    batch.set(ref, {
       'uid': uid,
       'username': username,
       'email': email,
@@ -70,11 +83,29 @@ class UserRepository {
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    batch.set(_db.collection(Col.publicProfiles).doc(uid), {
+      'username': username,
+      'salesCount': 0,
+    });
+    await batch.commit();
   }
 
   /// Save the editable profile fields.
-  Future<void> saveProfile(AppUser user) =>
-      _userRef(user.uid).set(user.toProfileMap(), SetOptions(merge: true));
+  Future<void> completeOnboarding(String uid) => _userRef(uid).update({
+    'onboardingCompleted': true,
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
+
+  /// Save the editable profile fields.
+  Future<void> saveProfile(AppUser user) async {
+    final batch = _db.batch();
+    batch.set(_userRef(user.uid), user.toProfileMap(), SetOptions(merge: true));
+    batch.set(_db.collection(Col.publicProfiles).doc(user.uid), {
+      'username': user.username,
+      'salesCount': user.salesCount,
+    });
+    await batch.commit();
+  }
 
   /// Save just the details checkout remembers. Used after an order so the next
   /// checkout is already filled in.

@@ -109,6 +109,8 @@ class InboxButton extends ConsumerWidget {
   const InboxButton({super.key});
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Const buttons must rebuild their tooltip when the app language changes.
+    Localizations.localeOf(context);
     final count = ref.watch(unreadNotificationCountProvider);
     return IconButton(
       tooltip: context.tr('Notifications'),

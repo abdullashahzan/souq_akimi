@@ -117,6 +117,116 @@ const seller2 = () => seller2Db;
 const stranger = () => strangerDb;
 const anon = () => anonDb;
 
+const owner = () => env.authenticatedContext('admin1', {
+  email: 'abdullashahzan@gmail.com', email_verified: true,
+}).firestore();
+
+const accessData = (status = 'suspended') => ({ status, reason: 'Moderation test',
+  actorId: 'admin1', updatedAt: FieldValue.serverTimestamp() });
+
+describe('owner controls and launch messages', () => {
+  it('only the verified owner can change access records', async () => {
+    await assertFails(stranger().doc('userAccess/buyer1').set(accessData()));
+    await assertFails(env.authenticatedContext('fake', {email: 'abdullashahzan@gmail.com', email_verified: false})
+      .firestore().doc('userAccess/buyer1').set({...accessData(), actorId: 'fake'}));
+    await assertSucceeds(owner().doc('userAccess/buyer1').set(accessData()));
+  });
+  it('prevents self-ban and protected-owner removal at the rule boundary', async () => {
+    await assertFails(owner().doc('userAccess/admin1').set(accessData()));
+    await assertFails(owner().doc('userAccess/srXNKWjiXBbza3JTfg4CAaHN4vx1').set(accessData('deleted')));
+    await assertFails(owner().doc('users/srXNKWjiXBbza3JTfg4CAaHN4vx1').delete());
+  });
+  it('blocks banned users from creating or modifying listings and images', async () => {
+    await assertSucceeds(owner().doc('userAccess/seller1').set(accessData()));
+    await assertFails(seller1().doc('products/new').set({sellerId: 'seller1'}));
+    await assertFails(seller1().doc('services/new').set({providerId: 'seller1'}));
+    await assertFails(seller1().doc('products/lamp').update({price: 1}));
+    await assertFails(seller1().doc('products/lamp').delete());
+    await assertFails(seller1().doc('images/new').set({ownerId: 'seller1', data: 'test', size: 4}));
+  });
+  it('a removed user cannot recreate their profile or clear the restriction', async () => {
+    await assertSucceeds(owner().doc('userAccess/buyer1').set(accessData('deleted')));
+    await assertSucceeds(owner().doc('users/buyer1').delete());
+    await assertFails(buyer().doc('users/buyer1').set({uid: 'buyer1', salesCount: 0}));
+    await assertFails(buyer().doc('userAccess/buyer1').delete());
+    await assertFails(owner().doc('userAccess/buyer1').set(accessData('active')));
+    await assertFails(owner().doc('userAccess/buyer1').delete());
+  });
+  it('restoring a suspended user restores writes but not deleted users', async () => {
+    await assertSucceeds(owner().doc('userAccess/seller1').set(accessData()));
+    await assertFails(seller1().doc('products/lamp').update({price: 1}));
+    await assertSucceeds(owner().doc('userAccess/seller1').set(accessData('active')));
+    await assertSucceeds(seller1().doc('products/lamp').update({price: 11}));
+  });
+  it('access reasons are private to the target and owner', async () => {
+    await assertSucceeds(owner().doc('userAccess/buyer1').set(accessData()));
+    await assertSucceeds(buyer().doc('userAccess/buyer1').get());
+    await assertFails(stranger().doc('userAccess/buyer1').get());
+    await assertFails(buyer().collection('userAccess').get());
+    await assertSucceeds(owner().collection('userAccess').get());
+  });
+  it('rejects empty reasons and forged audit actors', async () => {
+    await assertFails(owner().doc('userAccess/buyer1').set({...accessData(), reason: ''}));
+    await assertFails(owner().doc('userAccess/buyer1').set({...accessData(), actorId: 'stranger1'}));
+    await assertFails(stranger().doc('adminAudit/forged').set({actorId: 'stranger1', createdAt: FieldValue.serverTimestamp()}));
+    await assertSucceeds(owner().doc('adminAudit/real').set({actorId: 'admin1', action: 'test', createdAt: FieldValue.serverTimestamp()}));
+    await assertFails(owner().doc('adminAudit/real').delete());
+    await assertFails(owner().doc('adminAudit/real').update({action: 'changed'}));
+  });
+  it('publishes a readable full launch message for guests and future users', async () => {
+    await assertSucceeds(owner().doc('appConfig/launchMessage').set({id: 'revision-1', title: 'Bug update', body: 'We are fixing a bug.', active: true, everyLaunch: true}));
+    await assertSucceeds(anon().doc('appConfig/launchMessage').get());
+    await assertSucceeds(buyer().doc('appConfig/launchMessage').get());
+    await assertFails(buyer().doc('appConfig/launchMessage').update({body: 'Spoofed update'}));
+    await assertFails(anon().doc('appConfig/launchMessage').delete());
+    await assertFails(owner().doc('appConfig/launchMessage').update({body: 'x'.repeat(4001)}));
+    await assertSucceeds(owner().doc('appConfig/launchMessage').update({active: false}));
+  });
+  it('maintenance blocks new content but not owner moderation', async () => {
+    await assertFails(buyer().doc('appConfig/control').set({maintenance: true, message: ''}));
+    await assertSucceeds(owner().doc('appConfig/control').set({maintenance: true, message: 'Fixing bugs'}));
+    await assertFails(seller1().doc('products/new').set({sellerId: 'seller1'}));
+    await assertFails(seller1().doc('services/new').set({providerId: 'seller1'}));
+    await assertFails(seller1().doc('images/new').set({ownerId: 'seller1', data: 'test', size: 4}));
+    await assertSucceeds(owner().doc('products/lamp').update({isActive: false}));
+    await assertSucceeds(owner().doc('appConfig/control').update({maintenance: false}));
+    await assertSucceeds(seller1().doc('products/new').set({sellerId: 'seller1'}));
+  });
+  it('maintenance and bans reject new orders, including to restricted sellers', async () => {
+    await assertSucceeds(owner().doc('appConfig/control').set({maintenance: true, message: ''}));
+    await assertFails(placeOrder(buyer(), {orderNumber: 'MAINT'}));
+    await assertSucceeds(owner().doc('appConfig/control').update({maintenance: false}));
+    await assertSucceeds(owner().doc('userAccess/seller1').set(accessData()));
+    await assertFails(placeOrder(buyer(), {orderNumber: 'BANSELL'}));
+    await assertSucceeds(owner().doc('userAccess/seller1').set(accessData('active')));
+    await assertSucceeds(owner().doc('userAccess/buyer1').set(accessData()));
+    await assertFails(placeOrder(buyer(), {orderNumber: 'BANBUY'}));
+  });
+  it('demo and paused products cannot be ordered via a modified client', async () => {
+    await assertSucceeds(owner().doc('products/lamp').update({isDemo: true}));
+    await assertFails(placeOrder(buyer(), {orderNumber: 'DEMO'}));
+    await assertSucceeds(owner().doc('products/lamp').update({isDemo: false, isActive: false}));
+    await assertFails(placeOrder(buyer(), {orderNumber: 'PAUSED'}));
+  });
+  it('cannot bypass seller restrictions with extra order lines or a forged seller', async () => {
+    await assertFails(placeOrder(buyer(), {orderNumber: 'MULTILINE', overrides: {items: [
+      {productId: 'lamp', sellerId: 'seller1', quantity: 1, lineTotal: 10},
+      {productId: 'kettle', sellerId: 'seller2', quantity: 1, lineTotal: 12.5},
+    ], sellerIds: ['seller1', 'seller2'], total: 22.5}}));
+    await assertFails(placeOrder(buyer(), {orderNumber: 'FORGEDSELLER', overrides: {
+      items: [{productId: 'lamp', sellerId: 'stranger1', quantity: 1, lineTotal: 10}], sellerIds: ['stranger1'],
+    }}));
+  });
+  it('a user can finish onboarding but cannot grant themselves moderation powers', async () => {
+    const profile = {uid: 'new-user', email: 'new@example.com', salesCount: 0};
+    const db = env.authenticatedContext('new-user').firestore();
+    await assertSucceeds(db.doc('users/new-user').set(profile));
+    await assertSucceeds(db.doc('users/new-user').update({onboardingCompleted: true}));
+    await assertFails(db.doc('users/new-user').update({onboardingCompleted: 'yes'}));
+    await assertFails(db.doc('users/new-user').update({isAdmin: true}));
+  });
+});
+
 // --- helpers (these mirror OrderRepository, field for field) ----------------
 
 /** Places an order exactly as the app does: order + delivery + secret + stock
@@ -134,7 +244,7 @@ async function placeOrder(
     notify = true,
   },
 ) {
-  const deliveryId = `d-${orderNumber}`;
+  const deliveryId = productId === 'lamp' ? 'seller1' : 'seller2';
   await db.runTransaction(async (tx) => {
     const productRef = db.collection('products').doc(productId);
     const productSnap = await tx.get(productRef);
@@ -214,6 +324,7 @@ async function placeOrder(
         stock: FieldValue.increment(stockDelta ?? -quantity),
         soldCount: FieldValue.increment(quantity),
         updatedAt: FieldValue.serverTimestamp(),
+        lastOrderId: orderNumber,
       });
     }
   });
@@ -224,6 +335,11 @@ async function placeOrder(
  *  with the order summary update — as `releaseDelivery` does. */
 async function capture(db, { orderNumber, deliveryId, code, extra = {} }) {
   const orderRef = db.collection('orders').doc(orderNumber);
+  const deliveryRef = orderRef.collection('deliveries').doc(deliveryId);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(deliveryRef);
+    tx.update(deliveryRef, {otpAttempts: snap.data().otpAttempts + 1, pendingCode: code});
+  });
   const ids = (await orderRef.collection('deliveries').get()).docs.map(
     (d) => d.id,
   );
@@ -275,6 +391,7 @@ async function cancel(
       tx.update(productRef, {
         stock: FieldValue.increment(quantity),
         updatedAt: FieldValue.serverTimestamp(),
+        lastOrderId: orderNumber,
       });
     }
     tx.update(orderRef, { status: 'cancelled' });
@@ -370,7 +487,7 @@ describe('placeOrder (order + delivery + secret + stock in one transaction)', ()
   });
 
   it('refuses a seller notification written outside the order transaction', async () => {
-    await placeOrder(buyer(), { orderNumber: 'SQ-T00007', notify: false });
+    await assertFails(placeOrder(buyer(), { orderNumber: 'SQ-T00007', notify: false }));
     await assertFails(
       buyer()
         .collection('users')
@@ -503,7 +620,7 @@ describe('hand-over code', () => {
       .doc(deliveryId);
 
     for (let i = 1; i <= 5; i++) {
-      await assertSucceeds(ref.update({ otpAttempts: i }));
+      await assertSucceeds(ref.update({ otpAttempts: i, pendingCode: '000000' }));
     }
     await assertFails(ref.update({ otpAttempts: 6 }));
     await assertFails(
@@ -524,7 +641,7 @@ describe('hand-over code', () => {
       .doc(deliveryId);
     // Five misses, one increment at a time (the rules refuse a jump).
     for (let i = 1; i <= 5; i++) {
-      await assertSucceeds(deliveryRef.update({ otpAttempts: i }));
+      await assertSucceeds(deliveryRef.update({ otpAttempts: i, pendingCode: '000000' }));
     }
 
     const buyerDeliveryRef = buyer()
@@ -545,7 +662,7 @@ describe('hand-over code', () => {
         await tx.get(buyer().collection('orders').doc('SQ-T00016'));
         await tx.get(buyerDeliveryRef);
         tx.update(secretRef, { code: '654321' });
-        tx.update(buyerDeliveryRef, { otpAttempts: 0 });
+        tx.update(buyerDeliveryRef, { otpAttempts: 0, pendingCode: '' });
       }),
     );
 
@@ -717,7 +834,7 @@ describe('notifications', () => {
   });
 
   it('refuses a notification created for an unrelated order', async () => {
-    await placeOrder(buyer(), { orderNumber: 'SQ-T00043', notify: false });
+    await placeOrder(buyer(), { orderNumber: 'SQ-T00043' });
     await assertFails(
       seller2()
         .collection('users')
@@ -743,8 +860,8 @@ describe('notifications', () => {
 // --- product counters -------------------------------------------------------
 
 describe('product stock counters', () => {
-  it('lets a sale move stock and soldCount together', async () => {
-    await assertSucceeds(
+  it('rejects a standalone stock decrement without an order', async () => {
+    await assertFails(
       buyer()
         .collection('products')
         .doc('lamp')
@@ -754,20 +871,12 @@ describe('product stock counters', () => {
           updatedAt: FieldValue.serverTimestamp(),
         }),
     );
-    assert.equal(await stockOf('lamp'), 4);
+    assert.equal(await stockOf('lamp'), 5);
   });
 
   it('lets a cancellation restock without touching soldCount', async () => {
     await placeOrder(buyer(), { orderNumber: 'SQ-T00050' });
-    await assertSucceeds(
-      buyer()
-        .collection('products')
-        .doc('lamp')
-        .update({
-          stock: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        }),
-    );
+    await assertSucceeds(cancel(buyer(), {orderNumber: 'SQ-T00050'}));
     assert.equal(await stockOf('lamp'), 5);
     assert.equal(await soldOf('lamp'), 1);
   });
@@ -978,15 +1087,14 @@ describe('seller sales tally', () => {
   });
 
   it('allows the delivery path to add exactly one sale', async () => {
-    await assertSucceeds(
-      seller1().collection('users').doc('seller1').set(
-        {
-          salesCount: FieldValue.increment(1),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true },
-      ),
-    );
+    const deliveryId = await placeOrder(buyer(), {orderNumber: 'TALLY'});
+    const db = seller1();
+    await db.doc(`orders/TALLY/deliveries/${deliveryId}`).update({otpAttempts: 1, pendingCode: '123456'});
+    const batch = db.batch();
+    batch.update(db.doc(`orders/TALLY/deliveries/${deliveryId}`), {status: 'delivered', otpEntered: '123456', deliveredAt: FieldValue.serverTimestamp()});
+    batch.update(db.doc('orders/TALLY'), {status:'delivered'});
+    batch.update(db.doc('users/seller1'), {salesCount: 3, updatedAt:FieldValue.serverTimestamp(), salesOrderId:'TALLY', salesDeliveryId:deliveryId});
+    await assertSucceeds(batch.commit());
   });
 
   it('refuses a seller inflating the tally or editing their email', async () => {
@@ -1002,6 +1110,62 @@ describe('seller sales tally', () => {
         { merge: true },
       ),
     );
+  });
+});
+
+describe('public-release security regressions', () => {
+  it('keeps contact profiles private but publishes only safe seller fields', async () => {
+    await assertFails(buyer().doc('users/seller1').get());
+    await assertFails(buyer().collection('users').get());
+    await assertSucceeds(seller1().doc('users/seller1').get());
+    await assertSucceeds(owner().doc('users/seller1').get());
+    await assertSucceeds(seller1().doc('publicProfiles/seller1').set({username:'seller_one',salesCount:0}));
+    await assertSucceeds(anon().doc('publicProfiles/seller1').get());
+    await assertFails(seller1().doc('publicProfiles/seller1').set({username:'seller_one',salesCount:0,phone:'0500000000'}));
+    await assertFails(seller1().doc('publicProfiles/seller1').update({salesCount:100}));
+  });
+  it('rejects forged prices and non-positive quantities', async () => {
+    for (const quantity of [0,-1,0.5,1000]) {
+      await assertFails(placeOrder(buyer(), {orderNumber:'Q'+quantity,quantity}));
+    }
+    await assertFails(placeOrder(buyer(), {orderNumber:'PRICE',overrides:{total:1,items:[{
+      productId:'lamp',sellerId:'seller1',quantity:1,price:1,lineTotal:1,
+    }]}}));
+  });
+  it('rejects missing delivery/secret siblings and order-only status changes', async () => {
+    const id = await placeOrder(buyer(), {orderNumber:'SIBLINGS'});
+    await assertFails(buyer().doc('orders/SIBLINGS').update({status:'delivered'}));
+    await assertFails(buyer().doc('orders/SIBLINGS').update({status:'cancelled'}));
+    await assertFails(seller1().doc(`orders/SIBLINGS/deliveries/${id}`).set({
+      id:'extra',sellerId:'seller1',amount:10,status:'ready',otpAttempts:0,createdAt:FieldValue.serverTimestamp(),
+    }));
+  });
+  it('cannot forge or replay stock restoration', async () => {
+    await placeOrder(buyer(), {orderNumber:'RESTOCK'});
+    await assertFails(buyer().doc('products/lamp').update({stock:5,lastOrderId:'RESTOCK',updatedAt:FieldValue.serverTimestamp()}));
+    await assertSucceeds(cancel(buyer(), {orderNumber:'RESTOCK'}));
+    await assertFails(buyer().doc('products/lamp').update({stock:6,lastOrderId:'RESTOCK',updatedAt:FieldValue.serverTimestamp()}));
+  });
+  it('requires a stored, counted guess even for the correct delivery code', async () => {
+    const id = await placeOrder(buyer(), {orderNumber:'GUESS'});
+    const ref = seller1().doc(`orders/GUESS/deliveries/${id}`);
+    await assertFails(ref.update({status:'delivered',otpEntered:'123456',deliveredAt:FieldValue.serverTimestamp()}));
+    await assertSucceeds(ref.update({otpAttempts:1,pendingCode:'000000'}));
+    await assertFails(ref.update({status:'delivered',otpEntered:'123456',deliveredAt:FieldValue.serverTimestamp()}));
+    await assertFails(ref.update({pendingCode:'123456'}));
+    await assertFails(ref.update({otpAttempts:0}));
+    await assertSucceeds(capture(seller1(),{orderNumber:'GUESS',deliveryId:id,code:'123456'}));
+  });
+  it('every wrong guess persists and the sixth guess is rejected', async () => {
+    const id = await placeOrder(buyer(), {orderNumber:'LIMIT'});
+    for (let i=1;i<=5;i++) {
+      await assertFails(capture(seller1(),{orderNumber:'LIMIT',deliveryId:id,code:'00000'+i}));
+      assert.equal((await seller1().doc(`orders/LIMIT/deliveries/${id}`).get()).data().otpAttempts,i);
+    }
+    await assertFails(capture(seller1(),{orderNumber:'LIMIT',deliveryId:id,code:'123456'}));
+  });
+  it('a sales tally increment without a completed delivery is rejected', async () => {
+    await assertFails(seller1().doc('users/seller1').set({salesCount:1,updatedAt:FieldValue.serverTimestamp()}, {merge:true}));
   });
 });
 

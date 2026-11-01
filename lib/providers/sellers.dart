@@ -43,7 +43,7 @@ final sellerProfileProvider = StreamProvider.family<AppUser, String>((
   uid,
 ) {
   if (uid.isEmpty) return Stream.value(AppUser.empty(''));
-  return ref.watch(userRepositoryProvider).watch(uid);
+  return ref.watch(userRepositoryProvider).watchPublic(uid);
 });
 
 /// The visible display string for a seller, e.g. `@lina (12)`.

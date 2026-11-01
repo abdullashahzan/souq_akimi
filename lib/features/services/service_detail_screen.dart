@@ -14,7 +14,7 @@ import '../../providers/orders.dart';
 import '../../providers/sellers.dart';
 import '../../widgets/ai_button.dart';
 import '../../widgets/common.dart';
-import '../../widgets/listing_image.dart';
+import '../../widgets/listing_gallery.dart';
 import '../../widgets/service_card.dart';
 import '../auth/require_auth.dart';
 
@@ -252,73 +252,26 @@ class _ServiceDetailScreenState extends ConsumerState<ServiceDetailScreen> {
   }
 }
 
-class _ServiceGallery extends StatefulWidget {
+class _ServiceGallery extends StatelessWidget {
   const _ServiceGallery({required this.service});
 
   final Service service;
 
   @override
-  State<_ServiceGallery> createState() => _ServiceGalleryState();
-}
-
-class _ServiceGalleryState extends State<_ServiceGallery> {
-  int _page = 0;
-
-  @override
   Widget build(BuildContext context) {
-    final photos = widget.service.images.isEmpty
-        ? <String>['']
-        : widget.service.images;
     final theme = Theme.of(context);
-    return SizedBox(
-      height: (MediaQuery.sizeOf(context).width * 0.625).clamp(200.0, 360.0),
-      child: Stack(
-        children: [
-          PageView.builder(
-            itemCount: photos.length,
-            onPageChanged: (index) => setState(() => _page = index),
-            itemBuilder: (context, index) => photos[index].isEmpty
-                ? Container(
-                    color: theme.colorScheme.primaryContainer,
-                    child: Icon(
-                      serviceCategoryIcon(widget.service.category),
-                      size: 78,
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
-                  )
-                : ListingImage(
-                    url: photos[index],
-                    label: widget.service.title,
-                    seed: index == 0
-                        ? widget.service.id
-                        : '${widget.service.id}-$index',
-                  ),
-          ),
-          if (photos.length > 1)
-            PositionedDirectional(
-              bottom: 12,
-              start: 0,
-              end: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < photos.length; i++)
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      width: i == _page ? 20 : 7,
-                      height: 7,
-                      margin: const EdgeInsets.symmetric(horizontal: 3),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(99),
-                        color: i == _page
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.5),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-        ],
+    return ListingGallery(
+      key: ValueKey(service.id),
+      images: service.images,
+      label: service.title,
+      seed: service.id,
+      placeholder: Container(
+        color: theme.colorScheme.primaryContainer,
+        child: Icon(
+          serviceCategoryIcon(service.category),
+          size: 78,
+          color: theme.colorScheme.onPrimaryContainer,
+        ),
       ),
     );
   }

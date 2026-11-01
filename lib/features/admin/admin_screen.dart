@@ -15,6 +15,9 @@ import '../../widgets/ai_button.dart';
 import '../../widgets/common.dart';
 import '../../widgets/language_button.dart';
 import '../../widgets/listing_image.dart';
+import '../../widgets/listing_gallery.dart';
+import '../../providers/app_control.dart';
+import 'admin_management.dart';
 
 /// The marketplace owner's control room: live counts, every listing, and a
 /// one-tap announcement to every inbox.
@@ -46,7 +49,7 @@ class AdminScreen extends ConsumerWidget {
     }
 
     return DefaultTabController(
-      length: 3,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Admin dashboard'),
@@ -58,21 +61,34 @@ class AdminScreen extends ConsumerWidget {
                 ref.invalidate(adminStatsProvider);
                 ref.invalidate(adminProductsProvider);
                 ref.invalidate(adminServicesProvider);
+                ref.invalidate(adminUsersProvider);
+                ref.invalidate(adminAccessProvider);
               },
             ),
             const LanguageButton(),
             const SizedBox(width: 4),
           ],
           bottom: const TabBar(
+            isScrollable: true,
             tabs: [
               Tab(child: Text('Overview')),
               Tab(child: Text('Content')),
               Tab(child: Text('Broadcast')),
+              Tab(child: Text('Users')),
+              Tab(child: Text('Controls')),
+              Tab(child: Text('Activity')),
             ],
           ),
         ),
         body: const TabBarView(
-          children: [_OverviewTab(), _ContentTab(), _BroadcastTab()],
+          children: [
+            _OverviewTab(),
+            _ContentTab(),
+            _BroadcastTab(),
+            AdminUsersTab(),
+            AdminControlsTab(),
+            AdminActivityTab(),
+          ],
         ),
       ),
     );
@@ -156,7 +172,7 @@ class _OverviewTab extends ConsumerWidget {
               icon: Icons.campaign_outlined,
               label: 'Reach',
               value: '${data.users}',
-              hint: 'inboxes per announcement',
+              hint: 'registered students',
               color: const Color(0xFFDB2777),
             ),
           ];
@@ -424,6 +440,7 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
                         index: index,
                         child: _ServiceRow(
                           service: filtered[index],
+                          onEdit: () => _edit(service: filtered[index]),
                           onToggle: () => _toggle(service: filtered[index]),
                           onRemove: () => _removeService(filtered[index]),
                         ),
@@ -462,6 +479,7 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
                         index: index,
                         child: _ProductRow(
                           product: filtered[index],
+                          onEdit: () => _edit(product: filtered[index]),
                           onToggle: () => _toggle(product: filtered[index]),
                           onRemove: () => _removeProduct(filtered[index]),
                         ),
@@ -482,6 +500,10 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
             ),
           ),
         ),
+        TextButton(
+          onPressed: () => ref.read(adminUserLimitProvider.notifier).more(),
+          child: const Text('Load more listings'),
+        ),
       ],
     );
   }
@@ -493,9 +515,133 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
     );
     if (!ok) return;
     try {
-      await ref.read(adminRepositoryProvider).removeProduct(product);
+      await ref
+          .read(adminRepositoryProvider)
+          .removeProduct(product, actorUid: ref.read(currentUidProvider)!);
       ref.invalidate(adminStatsProvider);
       if (mounted) showMessage('Listing removed.');
+    } catch (error) {
+      if (mounted) showError(error);
+    }
+  }
+
+  Future<void> _edit({Product? product, Service? service}) async {
+    final title = TextEditingController(text: product?.name ?? service!.title);
+    final description = TextEditingController(
+      text: product?.description ?? service!.description,
+    );
+    final price = TextEditingController(
+      text: '${product?.price ?? service!.price}',
+    );
+    final stock = TextEditingController(text: '${product?.stock ?? 0}');
+    final form = GlobalKey<FormState>();
+    final ok = await showAdminFormDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit listing'),
+        content: SingleChildScrollView(
+          child: SizedBox(
+            width: 480,
+            child: Form(
+              key: form,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: title,
+                    maxLength: 120,
+                    decoration: InputDecoration(labelText: context.tr('Title')),
+                    validator: (value) => (value ?? '').trim().isEmpty
+                        ? context.tr('Required')
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: description,
+                    minLines: 3,
+                    maxLines: 6,
+                    maxLength: 4000,
+                    decoration: InputDecoration(
+                      labelText: context.tr('Description'),
+                    ),
+                    validator: (value) => (value ?? '').trim().isEmpty
+                        ? context.tr('Required')
+                        : null,
+                  ),
+                  TextFormField(
+                    controller: price,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: context.tr('Price (SAR)'),
+                    ),
+                    validator: (value) {
+                      final number = double.tryParse(value ?? '');
+                      return number != null &&
+                              number.isFinite &&
+                              number > 0 &&
+                              number <= 1000000
+                          ? null
+                          : context.tr('Enter a valid price');
+                    },
+                  ),
+                  if (product != null)
+                    TextFormField(
+                      controller: stock,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: context.tr('Stock'),
+                      ),
+                      validator: (value) {
+                        final number = int.tryParse(value ?? '');
+                        return number != null && number >= 0 && number <= 999
+                            ? null
+                            : context.tr('Use a stock from 0 to 999');
+                      },
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (form.currentState!.validate()) Navigator.pop(context, true);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    final values = (
+      title.text,
+      description.text,
+      double.tryParse(price.text) ?? 0,
+      int.tryParse(stock.text) ?? 0,
+    );
+    title.dispose();
+    description.dispose();
+    price.dispose();
+    stock.dispose();
+    if (ok != true || !mounted) return;
+    try {
+      await ref
+          .read(adminRepositoryProvider)
+          .editContent(
+            id: product?.id ?? service!.id,
+            service: service != null,
+            title: values.$1,
+            description: values.$2,
+            price: values.$3,
+            stock: values.$4,
+            actorUid: ref.read(currentUidProvider)!,
+          );
+      if (mounted) showMessage('Listing updated.');
     } catch (error) {
       if (mounted) showError(error);
     }
@@ -505,10 +651,18 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
     try {
       final repo = ref.read(adminRepositoryProvider);
       if (product != null) {
-        await repo.setProductActive(product.id, !product.isActive);
+        await repo.setProductActive(
+          product.id,
+          !product.isActive,
+          actorUid: ref.read(currentUidProvider)!,
+        );
       }
       if (service != null) {
-        await repo.setServiceActive(service.id, !service.isActive);
+        await repo.setServiceActive(
+          service.id,
+          !service.isActive,
+          actorUid: ref.read(currentUidProvider)!,
+        );
       }
       ref.invalidate(adminStatsProvider);
       if (mounted) showMessage('Listing updated.');
@@ -524,7 +678,9 @@ class _ContentTabState extends ConsumerState<_ContentTab> {
     );
     if (!ok) return;
     try {
-      await ref.read(adminRepositoryProvider).removeService(service);
+      await ref
+          .read(adminRepositoryProvider)
+          .removeService(service, actorUid: ref.read(currentUidProvider)!);
       ref.invalidate(adminStatsProvider);
       if (mounted) showMessage('Service removed.');
     } catch (error) {
@@ -559,11 +715,13 @@ class _ProductRow extends StatelessWidget {
     required this.product,
     required this.onRemove,
     required this.onToggle,
+    required this.onEdit,
   });
 
   final Product product;
   final VoidCallback onRemove;
   final VoidCallback onToggle;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -581,10 +739,14 @@ class _ProductRow extends StatelessWidget {
                 child: SizedBox(
                   width: 58,
                   height: 58,
-                  child: ListingImage(
-                    url: product.coverImage,
+                  child: PhotoPreview(
+                    images: product.images,
                     label: product.name,
-                    seed: product.id,
+                    child: ListingImage(
+                      url: product.coverImage,
+                      label: product.name,
+                      seed: product.id,
+                    ),
                   ),
                 ),
               ),
@@ -634,6 +796,11 @@ class _ProductRow extends StatelessWidget {
                 ),
               ),
               IconButton(
+                tooltip: context.tr('Edit listing'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+              ),
+              IconButton(
                 tooltip: context.tr(
                   product.isActive ? 'Pause listing' : 'Resume listing',
                 ),
@@ -665,11 +832,13 @@ class _ServiceRow extends StatelessWidget {
     required this.service,
     required this.onRemove,
     required this.onToggle,
+    required this.onEdit,
   });
 
   final Service service;
   final VoidCallback onRemove;
   final VoidCallback onToggle;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -687,10 +856,14 @@ class _ServiceRow extends StatelessWidget {
                 child: SizedBox(
                   width: 58,
                   height: 58,
-                  child: ListingImage(
-                    url: service.coverImage,
+                  child: PhotoPreview(
+                    images: service.images,
                     label: service.title,
-                    seed: service.id,
+                    child: ListingImage(
+                      url: service.coverImage,
+                      label: service.title,
+                      seed: service.id,
+                    ),
                   ),
                 ),
               ),
@@ -725,6 +898,11 @@ class _ServiceRow extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                tooltip: context.tr('Edit listing'),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
               ),
               IconButton(
                 tooltip: context.tr(
@@ -766,6 +944,7 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
   final _body = TextEditingController();
   bool _aiBusy = false;
   bool _sending = false;
+  bool _everyLaunch = true;
 
   @override
   void dispose() {
@@ -799,19 +978,12 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
 
   Future<void> _send() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    final stats = ref.read(adminStatsProvider).value;
-    final recipients = stats?.users ?? 0;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Send to everyone'),
-        content: Text(
-          recipients == 0
-              ? context.tr('There are no user inboxes to write to yet.')
-              : context.tr(
-                  'This will add the announcement to {count} inboxes. Continue?',
-                  args: {'count': '$recipients'},
-                ),
+        title: const Text('Publish launch message?'),
+        content: const Text(
+          'This replaces the current launch message for everyone, including guests and future users. The full message appears before they use the app.',
         ),
         actions: [
           TextButton(
@@ -820,7 +992,7 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Send to everyone'),
+            child: const Text('Publish'),
           ),
         ],
       ),
@@ -831,16 +1003,18 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
     if (uid == null) return;
     setState(() => _sending = true);
     try {
-      final sent = await ref
+      await ref
           .read(adminRepositoryProvider)
-          .broadcast(adminUid: uid, title: _title.text, body: _body.text);
+          .publishMessage(
+            adminUid: uid,
+            title: _title.text,
+            body: _body.text,
+            everyLaunch: _everyLaunch,
+          );
       if (!mounted) return;
       _title.clear();
       _body.clear();
-      showMessage(
-        'Announcement sent to {count} users.',
-        args: {'count': '$sent'},
-      );
+      showMessage('Launch message published.');
     } catch (error) {
       if (mounted) showError(error);
     } finally {
@@ -851,7 +1025,7 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final stats = ref.watch(adminStatsProvider).value;
+    final current = ref.watch(launchMessageProvider);
     final working = _aiBusy || _sending;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 96),
@@ -864,10 +1038,60 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
         ),
         const SizedBox(height: 4),
         Text(
-          'Write once. It lands in every student\'s in-app inbox and lights up the badge.',
+          'Communicate bugs, fixes and updates before users enter the app. No inbox visit is needed.',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
+        ),
+        const SizedBox(height: 16),
+        current.when(
+          loading: () => const LinearProgressIndicator(),
+          error: (error, _) => ErrorRetry(
+            error: error,
+            onRetry: () => ref.invalidate(launchMessageProvider),
+          ),
+          data: (message) => message.visible
+              ? Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Current launch message'),
+                        Text(message.title, style: theme.textTheme.titleMedium),
+                        Text(message.body),
+                        Text(
+                          message.everyLaunch
+                              ? 'Shown on every app open'
+                              : 'Shown once per user on this device',
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            TextButton(
+                              onPressed: working
+                                  ? null
+                                  : () {
+                                      _title.text = message.title;
+                                      _body.text = message.body;
+                                      setState(
+                                        () =>
+                                            _everyLaunch = message.everyLaunch,
+                                      );
+                                    },
+                              child: const Text('Edit'),
+                            ),
+                            TextButton(
+                              onPressed: working ? null : _withdraw,
+                              child: const Text('Withdraw message'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : const Text('No active launch message'),
         ),
         const SizedBox(height: 16),
         Form(
@@ -876,10 +1100,11 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
             children: [
               TextFormField(
                 controller: _title,
+                maxLength: 120,
                 onChanged: (_) => setState(() {}),
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  labelText: context.tr('Notification title'),
+                  labelText: context.tr('Message title'),
                   hintText: context.tr('A small campus update'),
                 ),
                 validator: (value) => (value ?? '').trim().length >= 3
@@ -889,6 +1114,7 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _body,
+                maxLength: 4000,
                 onChanged: (_) => setState(() {}),
                 minLines: 4,
                 maxLines: 8,
@@ -911,6 +1137,16 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
                 ),
               ),
               const SizedBox(height: 8),
+              SwitchListTile.adaptive(
+                value: _everyLaunch,
+                onChanged: working
+                    ? null
+                    : (value) => setState(() => _everyLaunch = value),
+                title: const Text('Show on every app open'),
+                subtitle: const Text(
+                  'Turn off to show once per user on each device. Publishing again creates a new acknowledgement.',
+                ),
+              ),
               Card(
                 margin: EdgeInsets.zero,
                 child: Padding(
@@ -975,18 +1211,11 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.send_outlined),
-                label: Text(
-                  stats == null
-                      ? context.tr('Send to everyone')
-                      : context.tr(
-                          'Send to everyone ({count})',
-                          args: {'count': '${stats.users}'},
-                        ),
-                ),
+                label: const Text('Publish launch message'),
               ),
               const SizedBox(height: 6),
               Text(
-                'Announcements are written to each inbox now; new users will not receive past announcements.',
+                'Visible to guests, existing users and new users until withdrawn. Receiving a new message requires a connection; cached messages remain available offline.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -997,5 +1226,39 @@ class _BroadcastTabState extends ConsumerState<_BroadcastTab> {
         ),
       ],
     );
+  }
+
+  Future<void> _withdraw() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Withdraw launch message?'),
+        content: const Text(
+          'It will stop appearing after devices receive the update.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Withdraw message'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _sending = true);
+    try {
+      await ref
+          .read(adminRepositoryProvider)
+          .withdrawMessage(ref.read(currentUidProvider)!);
+      if (mounted) showMessage('Launch message withdrawn.');
+    } catch (error) {
+      if (mounted) showError(error);
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 }

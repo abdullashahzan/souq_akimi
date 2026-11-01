@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:souq_akimi/widgets/ui.dart';
 
+import 'motion.dart';
+
 /// The app's visual language: a deep campus emerald, warm off-white paper,
 /// generous 24-point corners and soft, low-contrast depth.
 ///
@@ -16,7 +18,7 @@ class AppTheme {
   /// Amber used for gentle "waiting" accents.
   static const Color escrow = Color(0xFFB7791F);
 
-  static const Color canvas = Color(0xFFF4F6F2);
+  static const Color canvas = Color(0xFFF7F6F2);
   static const Color ink = Color(0xFF12211B);
   static const Color muted = Color(0xFF5B6B64);
 
@@ -123,17 +125,16 @@ class AppTheme {
       canvasColor: surface,
       textTheme: textTheme,
       visualDensity: VisualDensity.adaptivePlatformDensity,
-      // One, light, platform-appropriate transition everywhere: the M3
-      // fade-forwards on Android, the native slide (with the edge swipe-back
-      // gesture students expect) on iOS.
+      // Spring-settled pages on Android/desktop; retain native Cupertino slides
+      // and interactive edge-back gestures on Apple's platforms.
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.android: FluidPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.linux: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
-          TargetPlatform.fuchsia: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.linux: FluidPageTransitionsBuilder(),
+          TargetPlatform.windows: FluidPageTransitionsBuilder(),
+          TargetPlatform.fuchsia: FluidPageTransitionsBuilder(),
         },
       ),
       appBarTheme: AppBarTheme(
@@ -221,27 +222,53 @@ class AppTheme {
       // Column but crashes the moment a button sits inside a Row. Full-width
       // calls to action ask for it explicitly instead.
       filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(64, 54),
-          elevation: 0,
-          backgroundColor: scheme.primary,
-          foregroundColor: scheme.onPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-        ),
+        style:
+            FilledButton.styleFrom(
+              minimumSize: const Size(64, 54),
+              elevation: 0,
+              backgroundColor: scheme.primary,
+              foregroundColor: scheme.onPrimary,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ).copyWith(
+              foregroundBuilder: springButtonForeground,
+              shape: WidgetStateProperty.resolveWith(
+                (states) => RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    states.contains(WidgetState.pressed) ? 27 : 18,
+                  ),
+                ),
+              ),
+            ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 54),
-          foregroundColor: scheme.onSurface,
-          side: BorderSide(color: scheme.outlineVariant),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-        ),
+        style:
+            OutlinedButton.styleFrom(
+              minimumSize: const Size(64, 54),
+              foregroundColor: scheme.onSurface,
+              side: BorderSide(color: scheme.outlineVariant),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              textStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ).copyWith(
+              foregroundBuilder: springButtonForeground,
+              shape: WidgetStateProperty.resolveWith(
+                (states) => RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    states.contains(WidgetState.pressed) ? 27 : 18,
+                  ),
+                ),
+              ),
+            ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
@@ -250,7 +277,10 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-        ),
+        ).copyWith(foregroundBuilder: springButtonForeground),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: ButtonStyle(foregroundBuilder: springButtonForeground),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: isLight ? Colors.white : scheme.surfaceContainerHigh,

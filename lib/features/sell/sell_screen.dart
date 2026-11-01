@@ -96,7 +96,7 @@ class SellScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Start selling',
+                            'Your next chapter starts here.',
                             style: theme.textTheme.headlineSmall?.copyWith(
                               color: const Color(0xFF3A2A06),
                               fontWeight: FontWeight.w800,
@@ -133,6 +133,19 @@ class SellScreen extends ConsumerWidget {
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              children: [
+                for (final step in const <(IconData, String)>[
+                  (Icons.add_a_photo_outlined, 'Add photos'),
+                  (Icons.sell_outlined, 'Set your price'),
+                  (Icons.handshake_outlined, 'Meet on campus'),
+                ])
+                  Chip(avatar: Icon(step.$1, size: 16), label: Text(step.$2)),
+              ],
+            ),
             const SizedBox(height: 18),
             FadeSlideIn(
               index: 2,
@@ -140,9 +153,8 @@ class SellScreen extends ConsumerWidget {
                 icon: Icons.inventory_2_rounded,
                 title: 'Sell an item',
                 body: 'A physical item students can buy and receive in their room.',
-                foreground: Colors.white,
-                iconBackground: Colors.white.withValues(alpha: 0.16),
-                gradient: const [Color(0xFF0B5D4B), Color(0xFF14897A)],
+                foreground: const Color(0xFF123D30),
+                iconBackground: const Color(0xFFDDEBDD),
                 onTap: () => context.push('/sell/item'),
               ),
             ),
@@ -155,8 +167,7 @@ class SellScreen extends ConsumerWidget {
                 body:
                     'A skill, errand or service you can do for other students.',
                 foreground: const Color(0xFF3A2A06),
-                iconBackground: Colors.white.withValues(alpha: 0.36),
-                gradient: const [Color(0xFFF4C76A), Color(0xFFE3A33B)],
+                iconBackground: const Color(0xFFF5E8CD),
                 onTap: () => context.push('/sell/service'),
               ),
             ),
@@ -210,7 +221,6 @@ class _SellChoice extends StatelessWidget {
     required this.body,
     required this.foreground,
     required this.iconBackground,
-    required this.gradient,
     required this.onTap,
   });
 
@@ -219,7 +229,6 @@ class _SellChoice extends StatelessWidget {
   final String body;
   final Color foreground;
   final Color iconBackground;
-  final List<Color> gradient;
   final VoidCallback onTap;
 
   @override
@@ -236,11 +245,8 @@ class _SellChoice extends StatelessWidget {
           child: Ink(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              gradient: LinearGradient(
-                colors: gradient,
-                begin: AlignmentDirectional.topStart,
-                end: AlignmentDirectional.bottomEnd,
-              ),
+              color: Colors.white,
+              border: Border.all(color: theme.colorScheme.outlineVariant),
             ),
             child: Padding(
               padding: const EdgeInsets.all(18),
@@ -279,13 +285,7 @@ class _SellChoice extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Icon(
-                    Directionality.of(context) == TextDirection.rtl
-                        ? Icons.arrow_back_ios_new
-                        : Icons.arrow_forward_ios,
-                    size: 16,
-                    color: foreground,
-                  ),
+                  Icon(Icons.arrow_forward_ios, size: 16, color: foreground),
                 ],
               ),
             ),

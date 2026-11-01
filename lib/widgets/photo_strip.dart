@@ -4,6 +4,7 @@ import '../core/l10n.dart';
 
 import '../core/app_config.dart';
 import 'listing_image.dart';
+import 'listing_gallery.dart';
 
 /// The horizontal gallery editor used by both listing forms.
 ///
@@ -59,13 +60,18 @@ class PhotoStrip extends StatelessWidget {
                         child: SizedBox(
                           width: 100,
                           height: 100,
-                          child: ListingImage(
-                            url: images[i],
-                            label: context.tr(
-                              'Photo {n}',
-                              args: {'n': '${i + 1}'},
+                          child: PhotoPreview(
+                            images: images,
+                            label: context.tr('Photos'),
+                            initialIndex: i,
+                            child: ListingImage(
+                              url: images[i],
+                              label: context.tr(
+                                'Photo {n}',
+                                args: {'n': '${i + 1}'},
+                              ),
+                              seed: images[i],
                             ),
-                            seed: images[i],
                           ),
                         ),
                       ),

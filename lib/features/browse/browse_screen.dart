@@ -9,7 +9,9 @@ import '../../core/app_config.dart';
 import '../../core/motion.dart';
 import '../../data/search/search_engine.dart' show sortChoices;
 import '../../models/enums.dart';
+import '../../models/product_category.dart';
 import '../../providers/catalogue.dart';
+import '../../widgets/campus_banner.dart';
 import '../../widgets/common.dart';
 import '../../widgets/language_button.dart';
 import '../../widgets/notification_alerts.dart';
@@ -49,12 +51,28 @@ class BrowseScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: FadeSlideIn(
-                        child: _BrowseHero(
-                          onSearch: () => context.push('/search'),
+                        child: CampusBanner(
+                          search: _SearchEntry(
+                            onTap: () => context.push('/search'),
+                            light: true,
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 20),
+                    const _CategoryShortcuts(),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: DiscoveryLink(
+                        title: 'A little help, nearby',
+                        subtitle: 'Discover skills from your campus community',
+                        icon: Icons.handshake_outlined,
+                        color: const Color(0xFFF0E7D6),
+                        onTap: () => context.go('/services'),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
                     _FilterBar(
                       sort: filters.sort,
                       condition: filters.condition,
@@ -68,7 +86,9 @@ class BrowseScreen extends ConsumerWidget {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: SectionHeader(
-                        title: 'Latest on campus',
+                        title:
+                            ref.watch(browseCategoryProvider)?.label ??
+                            'Fresh finds',
                         trailing: results.isEmpty
                             ? null
                             : Text(
@@ -109,13 +129,29 @@ class BrowseScreen extends ConsumerWidget {
                     hasScrollBody: false,
                     child: EmptyState(
                       icon: Icons.storefront_rounded,
-                      title: 'Nothing to show yet',
-                      message: 'Be the first to list something on campus.',
-                      action: FilledButton.icon(
-                        onPressed: () => context.go('/sell'),
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('List an item'),
-                      ),
+                      title: productsAsync.value?.isNotEmpty == true
+                          ? 'No matching finds'
+                          : 'Nothing to show yet',
+                      message: productsAsync.value?.isNotEmpty == true
+                          ? 'Try another category or clear your filters.'
+                          : 'Be the first to list something on campus.',
+                      action: productsAsync.value?.isNotEmpty == true
+                          ? OutlinedButton(
+                              onPressed: () {
+                                ref
+                                    .read(browseCategoryProvider.notifier)
+                                    .select(null);
+                                ref
+                                    .read(browseFiltersProvider.notifier)
+                                    .reset();
+                              },
+                              child: const Text('Clear filters'),
+                            )
+                          : FilledButton.icon(
+                              onPressed: () => context.go('/sell'),
+                              icon: const Icon(Icons.add_rounded),
+                              label: const Text('List an item'),
+                            ),
                     ),
                   );
                 }
@@ -255,90 +291,77 @@ class _HeaderAction extends StatelessWidget {
   }
 }
 
-class _BrowseHero extends StatelessWidget {
-  const _BrowseHero({required this.onSearch});
-
-  final VoidCallback onSearch;
+class _CategoryShortcuts extends ConsumerWidget {
+  const _CategoryShortcuts();
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF093F34), Color(0xFF0E6A56), Color(0xFF14897A)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x300B5D4B),
-            blurRadius: 30,
-            offset: Offset(0, 16),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          PositionedDirectional(
-            top: -54,
-            end: -34,
-            child: _Glow(size: 170, opacity: 0.10),
-          ),
-          PositionedDirectional(
-            bottom: -70,
-            start: -30,
-            child: _Glow(size: 150, opacity: 0.07),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(22, 22, 22, 22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Find something great on campus',
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    height: 1.15,
-                    letterSpacing: -0.4,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(browseCategoryProvider);
+    final scheme = Theme.of(context).colorScheme;
+    final categories = <(ProductCategory?, IconData, Color)>[
+      (null, Icons.grid_view_rounded, const Color(0xFFDEEBDD)),
+      (ProductCategory.tech, Icons.headphones_rounded, const Color(0xFFE4E8F6)),
+      (ProductCategory.books, Icons.menu_book_rounded, const Color(0xFFF4E5C9)),
+      (ProductCategory.room, Icons.chair_outlined, const Color(0xFFF0DFD7)),
+      (ProductCategory.style, Icons.backpack_outlined, const Color(0xFFE7E0EF)),
+    ];
+    return SizedBox(
+      height: 100,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: categories.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        itemBuilder: (context, index) {
+          final (category, icon, color) = categories[index];
+          final active = category == selected;
+          return Semantics(
+            selected: active,
+            button: true,
+            child: PressableScale(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () =>
+                    ref.read(browseCategoryProvider.notifier).select(category),
+                child: SizedBox(
+                  width: 104,
+                  child: Column(
+                    children: [
+                      AnimatedContainer(
+                        duration: Motion.reduced(context)
+                            ? Duration.zero
+                            : Motion.medium,
+                        curve: Motion.spring,
+                        height: 60,
+                        width: 70,
+                        decoration: BoxDecoration(
+                          color: active ? scheme.primary : color,
+                          borderRadius: BorderRadius.circular(active ? 24 : 21),
+                        ),
+                        child: Icon(
+                          icon,
+                          size: 28,
+                          color: active ? scheme.onPrimary : scheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 7),
+                      Text(
+                        category?.label ?? 'All finds',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontWeight: active
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 7),
-                Text(
-                  'Buy and sell with students around you.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                _SearchEntry(onTap: onSearch, light: true),
-              ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Glow extends StatelessWidget {
-  const _Glow({required this.size, required this.opacity});
-
-  final double size;
-  final double opacity;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: opacity),
+          );
+        },
       ),
     );
   }
@@ -397,9 +420,7 @@ class _SearchEntry extends StatelessWidget {
                   borderRadius: BorderRadius.circular(11),
                 ),
                 child: Icon(
-                  Directionality.of(context) == TextDirection.rtl
-                      ? Icons.arrow_back_rounded
-                      : Icons.arrow_forward_rounded,
+                  Icons.arrow_forward_rounded,
                   size: 18,
                   color: scheme.primary,
                 ),

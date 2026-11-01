@@ -7,18 +7,18 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:105148624941:android:58ca977bcfd36e251748a4",
+        "mobilesdk_app_id": "1:105148624941:android:3af5e7a588f4296b1748a4",
         "android_client_info": {
-          "package_name": "com.example.souq_akimi"
+          "package_name": "com.souqakimi.app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "105148624941-inabt63vblfpjbgt2rd2ntm9a0q59upc.apps.googleusercontent.com",
+          "client_id": "105148624941-mpuc2b75362u0jpr79ofcf78nugirj8s.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
-            "package_name": "com.example.souq_akimi",
-            "certificate_hash": "9f4f9fdd10c24316f8948e3a565b0724cdf099fe"
+            "package_name": "com.souqakimi.app",
+            "certificate_hash": "f48244b3dc9bf6b51c13610f7c592d5050383735"
           }
         },
         {

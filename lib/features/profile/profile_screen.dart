@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:souq_akimi/widgets/ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -45,22 +44,6 @@ class ProfileScreen extends ConsumerWidget {
     try {
       await ref.read(sessionProvider).signOut();
       if (context.mounted) context.go('/login');
-    } catch (error) {
-      if (context.mounted) showError(error);
-    }
-  }
-
-  Future<void> _seed(BuildContext context, WidgetRef ref) async {
-    try {
-      final result = await ref.read(demoSeederProvider).seed();
-      if (!context.mounted) return;
-      showMessage(
-        'Seeded {products} products and {services} services.',
-        args: {
-          'products': '${result.products}',
-          'services': '${result.services}',
-        },
-      );
     } catch (error) {
       if (context.mounted) showError(error);
     }
@@ -261,6 +244,50 @@ class ProfileScreen extends ConsumerWidget {
               SectionHeader(title: 'Account'),
               const LanguageTile(),
               _LinkTile(
+                icon: Icons.help_outline,
+                title: 'Help, privacy and account removal',
+                subtitle: 'Support, reporting and download information',
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Souq Akimi'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Version 1.0.0 · Cash on delivery only. Never share your delivery code before receiving your item.',
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'For help, abusive listings, unsafe users, or account/data removal, contact the administrator. Include the listing ID or your account email. Never send your password or delivery code.',
+                          ),
+                          const SizedBox(height: 8),
+                          const SelectableText('abdullashahzan@gmail.com'),
+                          const SizedBox(height: 12),
+                          const Text('Privacy policy'),
+                          const SelectableText(
+                            'https://github.com/abdullashahzan/souq_akimi/blob/main/docs/privacy.md',
+                          ),
+                          const SizedBox(height: 12),
+                          const Text('Official downloads and updates'),
+                          const SelectableText(
+                            'https://github.com/abdullashahzan/souq_akimi/releases',
+                          ),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              _LinkTile(
                 icon: Icons.local_shipping_outlined,
                 title: 'Delivery details',
                 subtitle: profile.hasCompleteDeliveryDetails
@@ -286,16 +313,6 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ],
               const SizedBox(height: 12),
-              if (kDebugMode) ...[
-                SectionHeader(title: 'Developer'),
-                _LinkTile(
-                  icon: Icons.science_outlined,
-                  title: 'Seed demo data',
-                  subtitle: 'Write the sample catalogue into Firestore',
-                  onTap: () => _seed(context, ref),
-                ),
-                const SizedBox(height: 12),
-              ],
               OutlinedButton.icon(
                 onPressed: () => _signOut(context, ref),
                 icon: const Icon(Icons.logout),

@@ -21,16 +21,25 @@ rules_version = '2';
 //   4. Every order is cash on delivery, so there is no money to hold, capture
 //      or refund — the app never touches a card or a payment provider.
 //
-// Known limit: stock can be moved by any signed-in user (paired with `soldCount`
-// and bounded to 999) because rules cannot see which order a stock write
-// belongs to. Sellers can always correct their own listings; closing this hole
-// completely needs server-side writes (Blaze plan) or App Check.
+// Stock movements carry lastOrderId and must prove a new order or a one-time
+// cancellation. Private contacts never share a document with public profiles.
 // See docs/firestore_schema.md for the full threat model.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null && (isAdmin() || accountActive(request.auth.uid));
+    }
+
+    function accountActive(uid) {
+      return !exists(/databases/$(database)/documents/userAccess/$(uid))
+        || get(/databases/$(database)/documents/userAccess/$(uid)).data.status == 'active';
+    }
+
+    function canCreate() {
+      return isSignedIn() && (isAdmin()
+        || !exists(/databases/$(database)/documents/appConfig/control)
+        || get(/databases/$(database)/documents/appConfig/control).data.get('maintenance', false) == false);
     }
 
     function isSelf(uid) {
@@ -41,9 +50,53 @@ service cloud.firestore {
     // creation; the UI hides the dashboard for everyone else, but this is the
     // boundary that actually protects the data.
     function isAdmin() {
-      return isSignedIn()
+      return request.auth != null
         && request.auth.token.get('email', '') == 'abdullashahzan@gmail.com'
         && request.auth.token.get('email_verified', false) == true;
+    }
+
+    match /userAccess/{uid} {
+      allow get: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isAdmin()
+        && uid != request.auth.uid && uid != 'srXNKWjiXBbza3JTfg4CAaHN4vx1'
+        && request.resource.data.keys().hasOnly(['status', 'reason', 'actorId', 'updatedAt'])
+        && request.resource.data.status in ['active', 'suspended', 'deleted']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() > 0 && request.resource.data.reason.size() <= 1000
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.updatedAt == request.time
+        && (!exists(/databases/$(database)/documents/userAccess/$(uid))
+          || resource.data.status != 'deleted' || request.resource.data.status == 'deleted');
+      allow delete: if false;
+    }
+
+    match /appConfig/{id} {
+      allow read: if id in ['control', 'launchMessage'];
+      allow write: if isAdmin() && (
+        (id == 'control' && request.resource.data.maintenance is bool
+          && request.resource.data.message is string && request.resource.data.message.size() <= 2000)
+        || (id == 'launchMessage' && request.resource.data.active is bool
+          && (request.resource.data.active == false
+            || (request.resource.data.id is string && request.resource.data.id.size() > 0
+              && request.resource.data.title is string && request.resource.data.title.size() >= 3 && request.resource.data.title.size() <= 120
+              && request.resource.data.body is string && request.resource.data.body.size() >= 5 && request.resource.data.body.size() <= 4000
+              && request.resource.data.everyLaunch is bool)))
+      );
+    }
+
+    match /announcements/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
+    }
+
+    match /adminAudit/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin() && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
 
     // DELIVERY_OTP_MAX_ATTEMPTS (keep in sync with AppConfig.otpMaxAttempts).
@@ -51,11 +104,29 @@ service cloud.firestore {
       return 5;
     }
 
+    function completedSale(uid) {
+      let orderId = request.resource.data.salesOrderId;
+      let deliveryId = request.resource.data.salesDeliveryId;
+      let before = get(/databases/$(database)/documents/orders/$(orderId)/deliveries/$(deliveryId));
+      let after = getAfter(/databases/$(database)/documents/orders/$(orderId)/deliveries/$(deliveryId));
+      return before.data.status == 'ready' && after.data.status == 'delivered'
+        && after.data.sellerId == uid && after.data.deliveredAt == request.time;
+    }
+
+    match /publicProfiles/{uid} {
+      allow read: if true;
+      allow create, update: if isAdmin() || (isSelf(uid)
+        && request.resource.data.keys().hasOnly(['username', 'salesCount'])
+        && request.resource.data.username == getAfter(/databases/$(database)/documents/users/$(uid)).data.username
+        && request.resource.data.salesCount == getAfter(/databases/$(database)/documents/users/$(uid)).data.get('salesCount', 0));
+      allow delete: if isAdmin() && uid != request.auth.uid && uid != 'srXNKWjiXBbza3JTfg4CAaHN4vx1';
+    }
+
     // ----- users ----------------------------------------------------------
     match /users/{uid} {
       // Signed-in students can resolve seller names and sales tallies. Guests
       // see the catalogue without profiles, which keeps phone/room private.
-      allow read: if isSignedIn();
+      allow read: if isSelf(uid) || isAdmin();
       allow create: if isSelf(uid)
         && request.resource.data.uid == uid
         && request.resource.data.get('salesCount', 0) == 0;
@@ -65,8 +136,9 @@ service cloud.firestore {
       allow update: if isSelf(uid) && (
         (
           request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['salesCount', 'updatedAt'])
-          && request.resource.data.salesCount == resource.data.salesCount + 1
+            .hasOnly(['salesCount', 'updatedAt', 'salesOrderId', 'salesDeliveryId'])
+          && request.resource.data.salesCount == resource.data.get('salesCount', 0) + 1
+          && completedSale(uid)
         )
         ||
         (
@@ -77,11 +149,12 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly([
               'username', 'email', 'displayName', 'photoUrl', 'phone',
-              'building', 'roomNumber', 'updatedAt'
-            ])
+               'building', 'roomNumber', 'updatedAt', 'onboardingCompleted'
+             ])
+          && request.resource.data.get('onboardingCompleted', false) is bool
         )
       ) || isAdmin();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() && uid != request.auth.uid && uid != 'srXNKWjiXBbza3JTfg4CAaHN4vx1';
 
       // Each user's in-app inbox. A buyer writes one `new_sale` item for the
       // seller inside the same transaction that creates the order; the rules
@@ -179,8 +252,29 @@ service cloud.firestore {
 
     // ----- products -------------------------------------------------------
     match /products/{productId} {
+      function legitimateStockMove() {
+        let id = request.resource.data.lastOrderId;
+        let after = getAfter(/databases/$(database)/documents/orders/$(id));
+        let item = after.data.items[0];
+        return after.data.userId == request.auth.uid
+          && item.productId == productId && item.quantity is int && item.quantity > 0 && item.quantity <= 999
+          && request.resource.data.stock is int && request.resource.data.stock >= 0
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock','soldCount','updatedAt','lastOrderId'])
+          && request.resource.data.updatedAt == request.time
+          && ((
+            !exists(/databases/$(database)/documents/orders/$(id))
+            && after.data.createdAt == request.time && after.data.status == 'pending'
+            && request.resource.data.stock == resource.data.stock - item.quantity
+            && request.resource.data.soldCount == resource.data.soldCount + item.quantity
+          ) || (
+            get(/databases/$(database)/documents/orders/$(id)).data.status == 'pending'
+            && after.data.status == 'cancelled'
+            && request.resource.data.stock == resource.data.stock + item.quantity
+            && request.resource.data.soldCount == resource.data.soldCount
+          ));
+      }
       allow read: if true;
-      allow create: if isSignedIn()
+      allow create: if canCreate()
         && request.resource.data.sellerId == request.auth.uid;
       // Owner may edit, but sellerId must stay the same.
       allow update: if isAdmin()
@@ -195,23 +289,7 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && resource.data.sellerId != request.auth.uid
         && request.resource.data.sellerId == resource.data.sellerId
-        && ('soldCount' in resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys()
-             .hasOnly(['stock', 'soldCount', 'updatedAt'])
-        && request.resource.data.stock >= 0
-        && (
-          // A sale: stock down, soldCount up by exactly the same amount.
-          ((resource.data.stock - request.resource.data.stock) >= 1
-            && (resource.data.stock - request.resource.data.stock) <= 999
-            && request.resource.data.soldCount
-                 == resource.data.soldCount
-                      + (resource.data.stock - request.resource.data.stock))
-          ||
-          // A restock: stock up, soldCount untouched.
-          ((request.resource.data.stock - resource.data.stock) >= 1
-            && (request.resource.data.stock - resource.data.stock) <= 999
-            && request.resource.data.soldCount == resource.data.soldCount)
-        );
+        && legitimateStockMove();
       // Anyone signed in may record a single view — and touch nothing else.
       allow update: if isSignedIn()
         && request.resource.data.diff(resource.data).affectedKeys()
@@ -224,7 +302,7 @@ service cloud.firestore {
     // ----- services -------------------------------------------------------
     match /services/{serviceId} {
       allow read: if true;
-      allow create: if isSignedIn()
+      allow create: if canCreate()
         && request.resource.data.providerId == request.auth.uid;
       allow update: if isAdmin()
         || (isSignedIn()
@@ -246,11 +324,12 @@ service cloud.firestore {
             || resource.data.providerId == request.auth.uid
             || isAdmin());
 
-      allow create: if isSignedIn()
+      allow create: if canCreate()
         && request.resource.data.requesterId == request.auth.uid
         && request.resource.data.providerId is string
         && request.resource.data.providerId != ''
         && request.resource.data.providerId != request.auth.uid
+        && accountActive(request.resource.data.providerId)
         && get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.isActive == true
         && get(/databases/$(database)/documents/services/$(request.resource.data.serviceId)).data.providerId == request.resource.data.providerId
         && request.resource.data.phone is string
@@ -297,12 +376,30 @@ service cloud.firestore {
       // The first line must be paid for in the same transaction that creates
       // the order: stock down by `quantity`, soldCount up by `quantity`.
       function firstLineStockPaidFor(item) {
-        return getAfter(/databases/$(database)/documents/products/$(item.productId)).data.stock
+        return accountActive(item.sellerId)
+          && item.sellerId != request.auth.uid
+          && item.quantity is int && item.quantity >= 1 && item.quantity <= 999
+          && item.price == get(/databases/$(database)/documents/products/$(item.productId)).data.price
+          && item.lineTotal == math.round(item.price * item.quantity * 100) / 100
+          && getAfter(/databases/$(database)/documents/products/$(item.productId)).data.lastOrderId == orderNumber
+          && get(/databases/$(database)/documents/products/$(item.productId)).data.sellerId == item.sellerId
+          && get(/databases/$(database)/documents/products/$(item.productId)).data.isActive == true
+          && get(/databases/$(database)/documents/products/$(item.productId)).data.get('isDemo', false) == false
+          && getAfter(/databases/$(database)/documents/products/$(item.productId)).data.stock
                == get(/databases/$(database)/documents/products/$(item.productId)).data.stock
                     - item.quantity
           && getAfter(/databases/$(database)/documents/products/$(item.productId)).data.soldCount
                == get(/databases/$(database)/documents/products/$(item.productId)).data.soldCount
-                    + item.quantity;
+                     + item.quantity;
+      }
+
+      function completeOrderCreated(item) {
+        let delivery = getAfter(/databases/$(database)/documents/orders/$(orderNumber)/deliveries/$(item.sellerId));
+        let secret = getAfter(/databases/$(database)/documents/orders/$(orderNumber)/deliverySecrets/$(item.sellerId));
+        let notification = getAfter(/databases/$(database)/documents/users/$(item.sellerId)/notifications/$(('n-' + orderNumber)));
+        return delivery.data.status == 'ready' && delivery.data.amount == item.lineTotal
+          && secret.data.code.matches('^[0-9]{6}$') && notification.data.type == 'new_sale'
+          && notification.data.orderNumber == orderNumber && notification.data.createdAt == request.time;
       }
 
       // Visible to the buyer and to any seller with a delivery in the order.
@@ -326,7 +423,7 @@ service cloud.firestore {
               || request.auth.uid in resource.data.sellerIds));
 
       // Cash on delivery, one line, delivered to the buyer's hostel room.
-      allow create: if isSignedIn()
+      allow create: if canCreate()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.orderNumber == orderNumber
         && request.resource.data.status == 'pending'
@@ -343,21 +440,19 @@ service cloud.firestore {
         && request.resource.data.total > 0
         && request.resource.data.total <= 1000000
         && request.resource.data.items is list
-        && request.resource.data.items.size() >= 1
-        && request.resource.data.items.size() <= 50
+        && request.resource.data.items.size() == 1
         && request.resource.data.sellerIds is list
-        && request.resource.data.sellerIds.size() >= 1
-        && request.resource.data.sellerIds.size() <= 25
+        && request.resource.data.sellerIds.size() == 1
         // Souq is cartless: one line, one seller, total == line total, and
         // that line's stock must have moved in this very transaction. The
-        // parenthesis matters — without it `&& … ||` would let a single-line
-        // order skip every check above.
-        && (request.resource.data.items.size() != 1
-            || (request.resource.data.total
-                  == request.resource.data.items[0].lineTotal
+        // New orders are strictly single-line; extra lines may not bypass the
+        // seller-access, active-listing, demo and stock checks below.
+        && (request.resource.data.total
+                   == request.resource.data.items[0].lineTotal
                 && request.resource.data.sellerIds
                   == [request.resource.data.items[0].sellerId]
-                && firstLineStockPaidFor(request.resource.data.items[0])));
+                  && firstLineStockPaidFor(request.resource.data.items[0])
+                  && completeOrderCreated(request.resource.data.items[0]));
 
       // Participants may recompute the summary status (a denormalised view —
       // the per-delivery rules are what actually complete an order). Nothing
@@ -365,11 +460,11 @@ service cloud.firestore {
       allow update: if isSignedIn()
         && (resource.data.userId == request.auth.uid
             || request.auth.uid in resource.data.sellerIds)
-        && resource.data.status != 'cancelled'
+        && resource.data.status == 'pending'
         && request.resource.data.diff(resource.data).affectedKeys()
              .hasOnly(['status'])
-        && request.resource.data.status in
-             ['pending', 'delivered', 'cancelled'];
+         && request.resource.data.status == getAfter(/databases/$(database)/documents/orders/$(orderNumber)/deliveries/$(resource.data.sellerIds[0])).data.status
+         && request.resource.data.status in ['delivered', 'cancelled'];
 
       allow delete: if false;
 
@@ -394,6 +489,7 @@ service cloud.firestore {
           && request.resource.data.sellerId is string
           && request.resource.data.sellerId != ''
           && request.resource.data.sellerId in orderAfter().data.sellerIds
+          && deliveryId == request.resource.data.sellerId
           && request.resource.data.amount is number
           && request.resource.data.amount >= 0
           && request.resource.data.otpAttempts == 0
@@ -407,26 +503,28 @@ service cloud.firestore {
         allow update: if isSignedIn()
           && resource.data.sellerId == request.auth.uid
           && resource.data.status == 'ready'
-          && resource.data.otpAttempts < otpMaxAttempts()
+          && resource.data.otpAttempts > 0 && resource.data.otpAttempts <= otpMaxAttempts()
           && request.resource.data.status == 'delivered'
           && request.resource.data.sellerId == resource.data.sellerId
           && request.resource.data.amount == resource.data.amount
           && request.resource.data.otpAttempts == resource.data.otpAttempts
           && request.resource.data.deliveredAt == request.time
-          && request.resource.data.otpEntered == secret().data.code
+          && request.resource.data.otpEntered == resource.data.pendingCode
+          && resource.data.pendingCode == secret().data.code
           && order().data.status != 'cancelled'
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['status', 'otpEntered', 'deliveredAt']);
 
-        // 2. …and records a wrong guess as nothing more than +1 on the
-        //    counter. A rejected write changes no state, so an attacker gains
-        //    nothing by grinding: five misses lock this seller out until the
-        //    buyer mints a new code.
+        // 2. Store and count a guess BEFORE comparison. A rejected completion
+        //    can only retry the same stored code, not test another candidate.
+        //    Five committed guesses lock out new guesses until buyer rotation.
         allow update: if isSignedIn()
           && resource.data.sellerId == request.auth.uid
           && resource.data.status == 'ready'
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['otpAttempts'])
+                .hasOnly(['otpAttempts', 'pendingCode'])
+          && request.resource.data.pendingCode is string
+          && request.resource.data.pendingCode.matches('^[0-9]{6}$')
           && request.resource.data.otpAttempts
                == resource.data.otpAttempts + 1
           && request.resource.data.otpAttempts <= otpMaxAttempts();
@@ -437,15 +535,18 @@ service cloud.firestore {
           && resource.data.status == 'ready'
           && request.resource.data.status == 'cancelled'
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['status']);
+                .hasOnly(['status'])
+          && orderAfter().data.status == 'cancelled';
 
         // 4. The buyer resets the attempt counter (a rotation writes the new
         //    code on the sibling secret in the same transaction).
         allow update: if isSignedIn()
           && order().data.userId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['otpAttempts'])
-          && request.resource.data.otpAttempts == 0;
+                .hasOnly(['otpAttempts', 'pendingCode'])
+          && request.resource.data.otpAttempts == 0 && request.resource.data.pendingCode == ''
+          && resource.data.status == 'ready'
+          && getAfter(/databases/$(database)/documents/orders/$(orderNumber)/deliverySecrets/$(deliveryId)).data.code != secret().data.code;
 
         allow delete: if false;
       }
@@ -469,6 +570,8 @@ service cloud.firestore {
           && order().data.userId == request.auth.uid
           && request.resource.data.code is string
           && request.resource.data.code.matches('^[0-9]{6}$')
+          && getAfter(/databases/$(database)/documents/orders/$(orderNumber)/deliveries/$(deliveryId)).data.otpAttempts == 0
+          && getAfter(/databases/$(database)/documents/orders/$(orderNumber)/deliveries/$(deliveryId)).data.pendingCode == ''
           && request.resource.data.diff(resource.data).affectedKeys()
                .hasOnly(['code']);
 
@@ -482,7 +585,7 @@ service cloud.firestore {
       allow read: if true;
       // Only the owner may add one, and only within the size budget the
       // client promises (base64 of a photo the client has already resized).
-      allow create: if isSignedIn()
+      allow create: if canCreate()
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.data is string
         && request.resource.data.size <= 640 * 1024;

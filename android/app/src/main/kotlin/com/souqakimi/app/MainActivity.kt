@@ -1,4 +1,4 @@
-package com.example.souq_akimi
+package com.souqakimi.app
 
 import io.flutter.embedding.android.FlutterActivity
 

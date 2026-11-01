@@ -59,6 +59,9 @@ dart_defines.*.json
 !dart_defines.example.json
 *.jks
 *.keystore
+*.apk
+*.ipa
+signing.json
 **/key.properties
 **/*service-account*.json
 **/*serviceAccount*.json

@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.souq_akimi"
+    namespace = "com.souqakimi.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -18,8 +18,8 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.souq_akimi"
+        // Public GitHub release identity, registered with Firebase/Google OAuth.
+        applicationId = "com.souqakimi.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -32,10 +32,21 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            val path = System.getenv("SOUQ_SIGNING_STORE_FILE")
+            if (!path.isNullOrBlank()) {
+                storeFile = file(path)
+                storePassword = System.getenv("SOUQ_SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SOUQ_SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SOUQ_SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
     buildTypes {
         release {
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // Never fall back to a debug key for distributable builds.
+            signingConfig = signingConfigs.getByName("release")
             // Keep the plugin classes: Pigeon-generated methods are looked up
             // at runtime, and R8 would otherwise strip them from the release.
             proguardFiles(
@@ -44,6 +55,19 @@ android {
             )
         }
     }
+}
+
+val requireReleaseSigning by tasks.registering {
+    doLast {
+        listOf("STORE_FILE", "STORE_PASSWORD", "KEY_ALIAS", "KEY_PASSWORD").forEach {
+            check(!System.getenv("SOUQ_SIGNING_$it").isNullOrBlank()) {
+                "Release signing is required. Use python3 scripts/build_release.py."
+            }
+        }
+    }
+}
+tasks.matching { it.name == "assembleRelease" || it.name == "bundleRelease" }.configureEach {
+    dependsOn(requireReleaseSigning)
 }
 
 kotlin {

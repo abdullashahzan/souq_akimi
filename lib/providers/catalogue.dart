@@ -4,6 +4,7 @@ import '../core/app_config.dart';
 import '../data/search/search_engine.dart';
 import '../models/enums.dart';
 import '../models/product.dart';
+import '../models/product_category.dart';
 import '../models/service.dart';
 import 'auth.dart';
 import 'dependencies.dart';
@@ -186,12 +187,25 @@ final browseFiltersProvider =
       SearchFiltersNotifier.new,
     );
 
+class BrowseCategoryNotifier extends Notifier<ProductCategory?> {
+  @override
+  ProductCategory? build() => null;
+
+  void select(ProductCategory? category) => state = category;
+}
+
+final browseCategoryProvider =
+    NotifierProvider<BrowseCategoryNotifier, ProductCategory?>(
+      BrowseCategoryNotifier.new,
+    );
+
 /// The browse tab's catalogue filtered by its own sort + filter state.
 final filteredProductsProvider = Provider<List<Product>>((ref) {
   final catalogue = ref.watch(productCatalogueProvider);
   final filters = ref.watch(browseFiltersProvider);
+  final category = ref.watch(browseCategoryProvider);
   return searchProducts(
-    catalogue,
+    category == null ? catalogue : catalogue.where(category.matches).toList(),
     filters.query,
     sort: filters.sort,
     condition: filters.condition,

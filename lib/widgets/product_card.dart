@@ -7,6 +7,7 @@ import '../models/product.dart';
 import '../providers/sellers.dart';
 import 'common.dart';
 import 'listing_image.dart';
+import 'listing_gallery.dart';
 
 /// A catalogue tile. Used in the browse grid, search results and "my listings".
 class ProductCard extends ConsumerWidget {
@@ -39,9 +40,9 @@ class ProductCard extends ConsumerWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x0D0B1F18),
-              blurRadius: 24,
-              offset: Offset(0, 10),
+              color: Color(0x080B1F18),
+              blurRadius: 16,
+              offset: Offset(0, 6),
             ),
           ],
         ),
@@ -54,42 +55,78 @@ class ProductCard extends ConsumerWidget {
               children: [
                 AspectRatio(
                   aspectRatio: 1,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Shared with the detail screen's gallery, so opening a
-                      // listing zooms the same photo into place.
-                      Hero(
-                        tag: productHeroTag(product.id),
-                        child: ListingImage(
-                          url: product.coverImage,
-                          label: product.name,
-                          seed: product.id,
-                        ),
-                      ),
-                      if (paused || soldOut)
-                        Container(
-                          color: Colors.black.withValues(
-                            alpha: paused ? 0.42 : 0.5,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            paused ? 'PAUSED' : 'SOLD OUT',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 1.2,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(7, 7, 7, 0),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(19),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // Shared with the detail screen's gallery, so opening a
+                          // listing zooms the same photo into place.
+                          PhotoPreview(
+                            images: product.images,
+                            label: product.name,
+                            child: Hero(
+                              tag: productHeroTag(product.id),
+                              child: ListingImage(
+                                url: product.coverImage,
+                                label: product.name,
+                                seed: product.id,
+                              ),
                             ),
                           ),
-                        ),
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: StatusChip.condition(product.condition),
+                          if (paused || soldOut)
+                            Container(
+                              color: Colors.black.withValues(
+                                alpha: paused ? 0.42 : 0.5,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                paused ? 'PAUSED' : 'SOLD OUT',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                          PositionedDirectional(
+                            top: 10,
+                            start: 10,
+                            child: StatusChip.condition(product.condition),
+                          ),
+                          if (product.isDemo)
+                            PositionedDirectional(
+                              bottom: 10,
+                              end: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF0D2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Demo',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: const Color(0xFF4A3408),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          if (trailing != null)
+                            PositionedDirectional(
+                              top: 0,
+                              end: 0,
+                              child: trailing!,
+                            ),
+                        ],
                       ),
-                      if (trailing != null)
-                        PositionedDirectional(top: 0, end: 0, child: trailing!),
-                    ],
+                    ),
                   ),
                 ),
                 Padding(
@@ -122,7 +159,7 @@ class ProductCard extends ConsumerWidget {
                                 vertical: 5,
                               ),
                               decoration: BoxDecoration(
-                                color: scheme.primaryContainer,
+                                color: const Color(0xFFEDF4EA),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
@@ -131,6 +168,7 @@ class ProductCard extends ConsumerWidget {
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelLarge?.copyWith(
                                   fontWeight: FontWeight.w800,
+                                  fontSize: 16,
                                   color: scheme.onPrimaryContainer,
                                 ),
                               ),
@@ -197,7 +235,7 @@ String productHeroTag(String productId) => 'product-cover-$productId';
     >= 700 => 3,
     _ => minColumns,
   };
-  const gap = 12.0;
+  const gap = 14.0;
   final tileWidth = (width - gap * (columns - 1)) / columns;
   return (columns: columns, extent: tileWidth + 156);
 }

@@ -11,6 +11,7 @@ import '../../providers/dependencies.dart';
 import '../../providers/orders.dart';
 import '../../widgets/common.dart';
 import '../../widgets/listing_image.dart';
+import '../../widgets/listing_gallery.dart';
 
 /// Checkout for the single "buy now" item.
 ///
@@ -182,10 +183,14 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                   leading: SizedBox(
                     width: 56,
                     height: 56,
-                    child: ListingImage(
-                      url: product.images.isEmpty ? '' : product.images.first,
+                    child: PhotoPreview(
+                      images: product.images,
                       label: product.name,
-                      seed: product.id,
+                      child: ListingImage(
+                        url: product.images.isEmpty ? '' : product.images.first,
+                        label: product.name,
+                        seed: product.id,
+                      ),
                     ),
                   ),
                   title: Text(

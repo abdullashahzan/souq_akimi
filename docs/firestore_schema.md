@@ -7,6 +7,29 @@ transaction, and `firestore.rules` decides whether it may commit.
 This document is the reference for the collections, the fields that matter, the
 allowed transitions, the indexes, and the threat model.
 
+## Public-release changes (supersede the historical contracts below)
+
+- `users/{uid}` is private to its owner and administrator. Seller reads now use
+  `publicProfiles/{uid}` with **only** `username` and `salesCount`; no contacts.
+- Buyer stock writes carry `lastOrderId` and prove either a new order or a
+  pending → cancelled transition. The quantity and price match the real product.
+  Orders require matching delivery, secret and seller-notification documents.
+  Delivery IDs now equal the single seller UID, preventing additional legs.
+- Each guess is stored as `pendingCode` while incrementing `otpAttempts` in a
+  separate committed write **before** code comparison. Finalization can only
+  compare that stored guess. A modified client cannot submit unlimited new codes
+  without consuming attempts. Five guesses are allowed. Buyer rotation clears
+  the guess/counter and changes the secret atomically.
+- A private sales-tally update includes `salesOrderId` and `salesDeliveryId`,
+  proving a ready → delivered leg in the same transaction. Public profiles may
+  mirror but not invent the private tally. Order summaries must match the leg.
+- Public release AI is disabled and no shared AI credential is compiled. Demo
+  seeders/assets and live demo records are removed. Automated fixtures remain.
+
+The older descriptions below document the evolution of the app, not exceptions
+to these tightened rules. See [release guide](releases.md) and the executable
+rule tests for the current contract. Old development clients must upgrade.
+
 ---
 
 ## Principles
@@ -43,6 +66,7 @@ The single per-user document, created on first sign-in.
 | `phone` | string | Remembered delivery detail |
 | `building` | string | One of `Br 1` … `Br 10` |
 | `roomNumber` | string | Remembered delivery detail |
+| `onboardingCompleted` | bool | Optional, defaults false; authenticated welcome completion |
 | `createdAt` | timestamp | Server time |
 | `updatedAt` | timestamp | Server time |
 
@@ -193,6 +217,33 @@ Listing photos stored in Firestore because Storage is unavailable on Spark.
 Public read (the catalogue is public), owner-only create/delete, immutable.
 
 ---
+
+## Owner-control collections
+
+The administrator follow-up adds the following collections (see the
+[operator guide](admin-controls.md) for deletion and delivery limitations):
+
+- `userAccess/{uid}`: `status` (`active`, `suspended`, `deleted`), `reason`,
+  `actorId`, `updatedAt`. Only the verified admin may write; only the target
+  and admin may read. A deleted restriction cannot be cleared/restored through
+  client rules. Restricted UIDs lose marketplace writes; absence means active.
+  The admin UID/current admin is protected. Retained after marketplace removal.
+- `appConfig/control`: public maintenance flag/message; admin-write only. Stops
+  new content, images, orders and service requests, not normal existing-work
+  transitions for unrestricted accounts.
+- `appConfig/launchMessage`: public active launch-message revision, full title
+  and body, `everyLaunch`, actor and timestamps. Admin-write only. Local
+  acknowledgements are per device/account; publication reaches future users.
+- `announcements/{id}`: immutable admin-readable publication history.
+- `adminAudit/{id}`: immutable admin-readable action history. Client entries
+  must identify the verified current administrator and use server timestamps;
+  the trusted IAM Auth-cleanup tool may also append its operator audit record.
+
+New orders are strictly single-line, matching the current cartless client.
+Rules check the actual product's seller, access status, active/demo flags and
+stock transition. Admin inspection includes order/request snapshots but does
+not expose the buyer-only hand-over-secret subcollection. Marketplace removal
+does not delete transaction history or a Firebase Authentication account.
 
 ## Transition contracts
 

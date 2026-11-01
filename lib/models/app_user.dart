@@ -16,6 +16,7 @@ class AppUser {
     required this.building,
     required this.roomNumber,
     this.salesCount = 0,
+    this.onboardingCompleted = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -33,6 +34,7 @@ class AppUser {
 
   /// Completed deliveries. Public, so it can sit next to a seller's name.
   final int salesCount;
+  final bool onboardingCompleted;
 
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -81,6 +83,7 @@ class AppUser {
     building: Codec.str(data['building']),
     roomNumber: Codec.str(data['roomNumber']),
     salesCount: Codec.integer(data['salesCount']),
+    onboardingCompleted: data['onboardingCompleted'] == true,
     createdAt: Codec.date(data['createdAt']),
     updatedAt: Codec.date(data['updatedAt']),
   );
@@ -117,6 +120,7 @@ class AppUser {
     building: building ?? this.building,
     roomNumber: roomNumber ?? this.roomNumber,
     salesCount: salesCount ?? this.salesCount,
+    onboardingCompleted: onboardingCompleted,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );

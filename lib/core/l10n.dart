@@ -56,8 +56,12 @@ String _fill(String value, Map<String, String>? args) {
 }
 
 extension LocalizationContext on BuildContext {
-  String tr(String english, {Map<String, String>? args}) =>
-      translate(english, args: args);
+  String tr(String english, {Map<String, String>? args}) {
+    // Tooltips and field decorations need the same in-place locale updates as
+    // AppText, even when their parent route/widget is const.
+    Localizations.maybeLocaleOf(this);
+    return translate(english, args: args);
+  }
 
   bool get isArabic => AppLocale.isArabic;
 
@@ -67,6 +71,105 @@ extension LocalizationContext on BuildContext {
 
 /// Arabic translations. English is the source language and the fallback.
 const Map<String, String> _arabic = {
+  'Help, privacy and account removal': 'المساعدة والخصوصية وإزالة الحساب',
+  'Support, reporting and download information':
+      'الدعم والإبلاغ ومعلومات التنزيل',
+  'Version 1.0.0 · Cash on delivery only. Never share your delivery code before receiving your item.': 'الإصدار 1.0.0 · الدفع نقدًا عند الاستلام فقط. لا تشارك رمز التسليم قبل استلام المنتج.',
+  'For help, abusive listings, unsafe users, or account/data removal, contact the administrator. Include the listing ID or your account email. Never send your password or delivery code.': 'للمساعدة أو الإبلاغ عن إعلانات مسيئة أو مستخدمين غير آمنين أو لطلب إزالة حسابك وبياناتك، تواصل مع المسؤول. أرفق معرّف الإعلان أو بريد حسابك. لا ترسل كلمة المرور أو رمز التسليم أبدًا.',
+  'Privacy policy': 'سياسة الخصوصية',
+  'Official downloads and updates': 'التنزيلات والتحديثات الرسمية',
+  // ---- Owner controls & first-run welcome ---------------------------------
+  'Service requests': 'طلبات الخدمات',
+  'Required': 'مطلوب',
+  'Activity': 'النشاط',
+  'Search loaded activity': 'ابحث في النشاط المحمّل',
+  'No activity yet': 'لا يوجد نشاط بعد',
+  'Load more activity': 'تحميل المزيد من النشاط',
+  'Load more listings': 'تحميل المزيد من الإعلانات',
+  'Inspect marketplace activity here. Order totals, delivery codes and transaction history cannot be overwritten from the dashboard.': 'راجع نشاط السوق هنا. لا يمكن الكتابة فوق مبالغ الطلبات أو رموز التسليم أو سجل المعاملات من لوحة التحكم.',
+  'Welcome to Souq Akimi': 'مرحبًا بك في سوق أكيمي',
+  'Find pre-loved essentials and useful skills from people on your campus.':
+      'اكتشف مستلزمات مستعملة ومهارات مفيدة من مجتمع جامعتك.',
+  'Find it. See it. Make it yours.': 'اكتشفه، شاهده، واجعله لك.',
+  'Browse or search, filter your finds, and tap a photo to enlarge it. Prices are in SAR.': 'تصفّح أو ابحث، واستخدم الفلاتر، وانقر على الصورة لتكبيرها. الأسعار بالريال السعودي.',
+  'Buy and sell with confidence': 'اشترِ وبِع بثقة',
+  'Pay cash on delivery. Only share your delivery code after receiving your item. Never share it in advance.': 'ادفع نقدًا عند الاستلام. لا تشارك رمز التسليم إلا بعد استلام منتجك، ولا تشاركه مسبقًا أبدًا.',
+  'Offer a service or send a request. Track replies in your inbox and keep your contact details up to date.': 'قدّم خدمة أو أرسل طلبًا. تابع الردود في صندوق الوارد وحدّث بيانات التواصل باستمرار.',
+  'Start exploring': 'ابدأ الاستكشاف',
+  'A message from Souq Akimi': 'رسالة من سوق أكيمي',
+  'Got it': 'فهمت',
+  'Connection needed': 'يلزم الاتصال بالإنترنت',
+  'We could not check your account access. Reconnect and try again.':
+      'تعذّر التحقق من صلاحية حسابك. أعد الاتصال وحاول مجددًا.',
+  'Account removed': 'تمت إزالة الحساب',
+  'Account suspended': 'الحساب موقوف',
+  'Marketplace maintenance': 'صيانة السوق',
+  'New listings, purchases and service requests are temporarily paused. Existing orders can still be managed.': 'تم إيقاف الإعلانات والمشتريات وطلبات الخدمات الجديدة مؤقتًا. يمكنك متابعة الطلبات الحالية.',
+  'Controls': 'التحكم',
+  'registered students': 'مستخدمون مسجّلون',
+  'Search username, email or UID': 'ابحث باسم المستخدم أو البريد أو المعرّف',
+  'Suspend user?': 'إيقاف المستخدم؟',
+  'Restore user access?': 'استعادة صلاحية المستخدم؟',
+  'Remove user from marketplace?': 'إزالة المستخدم من السوق؟',
+  'This blocks the user and permanently removes their marketplace profile, listings, services, photos and inbox. Order/request history is retained. Their Firebase login must be deleted separately using the trusted admin tool.': 'سيتم حظر المستخدم وحذف ملفه وإعلاناته وخدماته وصوره وصندوق وارده نهائيًا. يُحتفظ بسجل الطلبات. يجب حذف حساب تسجيل الدخول في Firebase بشكل منفصل بأداة المسؤول الموثوقة.',
+  'Access will be restored. Listings stay paused until reviewed.':
+      'ستُستعاد صلاحية المستخدم. تبقى الإعلانات موقوفة حتى مراجعتها.',
+  'The user will be blocked from marketplace actions and their listings will be paused.':
+      'سيتم منع المستخدم من التعامل في السوق وإيقاف إعلاناته.',
+  'Reason shown to user': 'السبب الذي يظهر للمستخدم',
+  'A moderation reason is required.': 'يجب إدخال سبب الإجراء.',
+  'Type DELETE to confirm': 'اكتب DELETE للتأكيد',
+  'User access updated.': 'تم تحديث صلاحية المستخدم.',
+  'Suspension is reversible. Removal is permanent. The administrator account is protected.':
+      'يمكن التراجع عن الإيقاف. الإزالة نهائية. حساب المسؤول محمي.',
+  'Protected administrator': 'مسؤول محمي',
+  'Restore access': 'استعادة الصلاحية',
+  'Suspend': 'إيقاف',
+  'Remove user': 'إزالة المستخدم',
+  'Retry removal cleanup': 'إعادة محاولة تنظيف بيانات المستخدم',
+  'Load more users': 'تحميل المزيد من المستخدمين',
+  'active': 'نشط',
+  'suspended': 'موقوف',
+  'deleted': 'محذوف',
+  'The administrator account is protected.': 'حساب المسؤول محمي.',
+  'A removed profile cannot be restored.': 'لا يمكن استعادة الملف المحذوف.',
+  'Application controls': 'التحكم بالتطبيق',
+  'Pause new marketplace activity?': 'إيقاف التعاملات الجديدة في السوق؟',
+  'Reopen marketplace?': 'إعادة فتح السوق؟',
+  'This controls new listings, purchases, photo uploads and service requests. Existing orders and requests can still be completed. Admin access is retained.': 'يتحكم هذا في الإعلانات والمشتريات ورفع الصور وطلبات الخدمات الجديدة. يمكن إكمال الطلبات الحالية وتبقى صلاحيات المسؤول متاحة.',
+  'Marketplace controls updated.': 'تم تحديث إعدادات السوق.',
+  'New activity is paused': 'التعاملات الجديدة موقوفة',
+  'Marketplace is open': 'السوق مفتوح',
+  'Maintenance message (optional)': 'رسالة الصيانة (اختيارية)',
+  'Reopen marketplace': 'إعادة فتح السوق',
+  'Pause new activity': 'إيقاف التعاملات الجديدة',
+  'Recent admin activity': 'إجراءات المسؤول الأخيرة',
+  'The latest 50 audit entries. Order and request history is protected from destructive edits.':
+      'آخر 50 إجراءً مسجّلًا. سجل الطلبات محمي من التعديلات المتلفة.',
+  'Publish launch message?': 'نشر رسالة بدء التشغيل؟',
+  'This replaces the current launch message for everyone, including guests and future users. The full message appears before they use the app.': 'ستحل هذه الرسالة محل رسالة بدء التشغيل الحالية للجميع، بما فيهم الزوار والمستخدمون الجدد. تظهر الرسالة كاملة قبل استخدام التطبيق.',
+  'Publish': 'نشر',
+  'Launch message published.': 'تم نشر رسالة بدء التشغيل.',
+  'Communicate bugs, fixes and updates before users enter the app. No inbox visit is needed.': 'أبلغ المستخدمين بالأخطاء والإصلاحات والتحديثات قبل دخول التطبيق، دون الحاجة لفتح صندوق الوارد.',
+  'Current launch message': 'رسالة بدء التشغيل الحالية',
+  'Shown on every app open': 'تظهر عند كل فتح للتطبيق',
+  'Shown once per user on this device':
+      'تظهر مرة واحدة لكل مستخدم على هذا الجهاز',
+  'Withdraw message': 'سحب الرسالة',
+  'No active launch message': 'لا توجد رسالة بدء تشغيل نشطة',
+  'Message title': 'عنوان الرسالة',
+  'Show on every app open': 'إظهارها عند كل فتح للتطبيق',
+  'Turn off to show once per user on each device. Publishing again creates a new acknowledgement.': 'أوقف هذا الخيار لعرضها مرة واحدة لكل مستخدم على كل جهاز. إعادة النشر تعرضها من جديد.',
+  'Publish launch message': 'نشر رسالة بدء التشغيل',
+  'Visible to guests, existing users and new users until withdrawn. Receiving a new message requires a connection; cached messages remain available offline.': 'تظهر للزوار والمستخدمين الحاليين والجدد حتى سحبها. يلزم اتصال لاستلام رسالة جديدة؛ تبقى الرسائل المحفوظة متاحة دون اتصال.',
+  'Withdraw launch message?': 'سحب رسالة بدء التشغيل؟',
+  'It will stop appearing after devices receive the update.':
+      'ستتوقف عن الظهور بعد وصول التحديث إلى الأجهزة.',
+  'Launch message withdrawn.': 'تم سحب رسالة بدء التشغيل.',
+  'Enter a valid price': 'أدخل سعرًا صالحًا',
+  'Use a stock from 0 to 999': 'أدخل كمية من 0 إلى 999',
+  'Check the title, description, price and stock.':
+      'تحقّق من العنوان والوصف والسعر والكمية.',
   // ---- Brand & shell -----------------------------------------------------
   'Souq Akimi': 'سوق أكيمي',
   'Browse': 'تصفّح',
@@ -93,6 +196,52 @@ const Map<String, String> _arabic = {
   'Buy and sell with students around you.':
       'اشترِ وبِع مع طلاب جامعتك من حولك.',
   'Latest on campus': 'أحدث ما في الحرم',
+  'Fresh finds': 'اكتشافات جديدة',
+  'A little more local': 'أقرب إليك',
+  'Good finds.\nBetter campus life.': 'اكتشافات مميزة.\nحياة جامعية أجمل.',
+  'Pre-loved things. Useful skills. People nearby.':
+      'أغراض تستحق فرصة ثانية. مهارات مفيدة. وأشخاص بالقرب منك.',
+  'A little help, nearby': 'مساعدة قريبة منك',
+  'Discover skills from your campus community':
+      'اكتشف مهارات من مجتمعك الجامعي',
+  'All finds': 'كل المعروضات',
+  'Tech': 'تقنية',
+  'Books & study': 'كتب ودراسة',
+  'Room essentials': 'أساسيات الغرفة',
+  'Style & everyday': 'أناقة ويوميات',
+  'No matching finds': 'لا توجد معروضات مطابقة',
+  'Try another category or clear your filters.':
+      'جرّب فئة أخرى أو امسح عوامل التصفية.',
+  'Demo': 'تجريبي',
+  'Demo item': 'منتج تجريبي',
+  'View photo': 'عرض الصورة',
+  'View full-screen': 'عرض بملء الشاشة',
+  'Pinch or double-tap to zoom': 'قرّب بإصبعين أو انقر مرتين للتكبير',
+  'Previous photo': 'الصورة السابقة',
+  'Next photo': 'الصورة التالية',
+  'Zoom in': 'تكبير',
+  'Reset zoom': 'إعادة حجم الصورة',
+  'Campus-ready laptop': 'لابتوب للدراسة',
+  'Wireless headphones': 'سماعات لاسلكية',
+  'Weekend reading bundle': 'مجموعة كتب للقراءة',
+  'Minimal study chair': 'كرسي دراسة بسيط',
+  'Warm-light desk lamp': 'مصباح مكتب بإضاءة دافئة',
+  'Everyday campus backpack': 'حقيبة للجامعة',
+  'Desktop keyboard': 'لوحة مفاتيح للمكتب',
+  'Reusable water bottle': 'قارورة ماء قابلة لإعادة الاستخدام',
+  'Wireless study mouse': 'فأرة لاسلكية للدراسة',
+  'Favourite study mug': 'كوب لجلسات الدراسة',
+  'Demo items are for browsing only and cannot be purchased.':
+      'المنتجات التجريبية للتصفح فقط ولا يمكن شراؤها.',
+  'Made easier, together.': 'معًا، تصبح الأمور أسهل.',
+  'From study sessions to everyday errands, find a helping hand nearby.':
+      'من جلسات الدراسة إلى المشاوير اليومية، اعثر على من يساعدك بالقرب منك.',
+  'Share your skills': 'شارك مهاراتك',
+  'Share your skills with your campus community.':
+      'شارك مهاراتك مع مجتمعك الجامعي.',
+  'Your next chapter starts here.': 'بداية جديدة لأغراضك ومهاراتك.',
+  'Set your price': 'حدّد السعر',
+  'Meet on campus': 'التقِ في الحرم',
   'Dismiss': 'إغلاق',
   'Confirm': 'تأكيد',
   'Notifications marked read.': 'تم تحديد الإشعارات كمقروءة.',

@@ -87,6 +87,7 @@ class AppConfig {
   /// The single marketplace administrator. Access is enforced again in
   /// `firestore.rules`, so changing this constant alone grants nothing.
   static const String adminEmail = 'abdullashahzan@gmail.com';
+  static const String adminUid = 'srXNKWjiXBbza3JTfg4CAaHN4vx1';
   static const String adminUsername = 'shahzan';
 
   // --- Backend ------------------------------------------------------------

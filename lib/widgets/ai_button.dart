@@ -1,6 +1,7 @@
 import 'package:souq_akimi/widgets/ui.dart';
 
 import '../core/l10n.dart';
+import '../core/ai_config.dart';
 
 /// A compact "do this with AI" action with its own spinner.
 class AiAssistButton extends StatelessWidget {
@@ -19,6 +20,7 @@ class AiAssistButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!AiConfig.enabled) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     return TextButton.icon(
       onPressed: loading ? null : onPressed,
@@ -45,6 +47,7 @@ class AiHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!AiConfig.enabled) return const SizedBox.shrink();
     final theme = Theme.of(context);
     return Text(
       'AI can make mistakes — give it a quick read before publishing.',
